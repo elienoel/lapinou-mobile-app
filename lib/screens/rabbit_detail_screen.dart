@@ -15,6 +15,7 @@ import '../widgets/care_sheets.dart';
 import '../widgets/genealogy_tree_widget.dart';
 import '../widgets/rabbit_avatar.dart';
 import 'add_rabbit_screen.dart';
+import '../widgets/app_icon.dart';
 
 class RabbitDetailScreen extends StatefulWidget {
   final Rabbit rabbit;
@@ -435,7 +436,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('🍼', style: TextStyle(fontSize: 40)),
+              AppIcon(AppIcons.nest, size: 56, color: AppColors.primary),
               SizedBox(height: 12),
               Text(
                 'Aucune portée ni descendance enregistrée',
@@ -722,7 +723,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
               ),
               child: Row(
                 children: [
-                  Text(due.category.emoji, style: const TextStyle(fontSize: 18)),
+                  CareCategoryIcon(due.category, size: 22, color: AppColors.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -779,9 +780,10 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                         borderRadius: BorderRadius.circular(10),
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        care.category.emoji,
-                        style: const TextStyle(fontSize: 20),
+                      child: CareCategoryIcon(
+                        care.category,
+                        size: 24,
+                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(width: 12),

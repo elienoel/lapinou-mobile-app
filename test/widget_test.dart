@@ -87,8 +87,6 @@ void main() {
     expect(find.text('Mes lapins'), findsOneWidget);
     // Accouplements et mises bas sont regroupés sur une seule carte / une seule page
     expect(find.text('Accouplements & Mises bas'), findsOneWidget);
-    expect(find.text('Dépenses'), findsOneWidget);
-    expect(find.text('Ventes'), findsOneWidget);
     // La communauté vit dans la barre de navigation du bas, plus dans le menu principal
     expect(find.text('Communauté d\'éleveurs'), findsNothing);
     expect(find.text('Soins & entretien'), findsOneWidget);

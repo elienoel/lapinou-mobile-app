@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
+import '../widgets/offline_banner.dart';
 import 'home_dashboard_screen.dart';
 import 'community_feed_screen.dart';
 import 'finances_screen.dart';
@@ -41,7 +42,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: screens),
+      body: Column(
+        children: [
+          const SafeArea(bottom: false, child: OfflineBanner()),
+          Expanded(child: IndexedStack(index: _currentIndex, children: screens)),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,

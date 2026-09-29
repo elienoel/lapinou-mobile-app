@@ -5,6 +5,7 @@ import '../models/care.dart';
 import '../models/rabbit.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
+import 'app_icon.dart';
 
 const _sheetShape = RoundedRectangleBorder(
   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -173,7 +174,23 @@ class _CareTreatmentSheetState extends State<CareTreatmentSheet> {
                 for (final c in CareCategory.values)
                   ChoiceChip(
                     key: ValueKey('treatment-category-${c.apiValue}'),
-                    label: Text('${c.emoji} ${c.label}'),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CareCategoryIcon(
+                          c,
+                          size: 16,
+                          color:
+                              _category == c
+                                  ? Colors.white
+                                  : AppColors.textPrimary,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(c.label, overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
                     selected: _category == c,
                     selectedColor: AppColors.primary,
                     checkmarkColor: Colors.white,
@@ -459,9 +476,18 @@ class _CareRecordSheetState extends State<CareRecordSheet> {
                   for (final t in treatments)
                     DropdownMenuItem(
                       value: t.id,
-                      child: Text(
-                        '${t.category.emoji} ${t.name}',
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          CareCategoryIcon(
+                            t.category,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(t.name, overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
                       ),
                     ),
                 ],

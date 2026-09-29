@@ -9,6 +9,7 @@ import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/litter_sheets.dart';
 import 'rabbit_detail_screen.dart';
+import '../widgets/app_icon.dart';
 
 enum _LitterFilter { all, atNest, toWean, weaned }
 
@@ -177,7 +178,7 @@ class _LittersViewState extends State<LittersView> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Text('🧺', style: TextStyle(fontSize: 34)),
+            child: const AppIcon(AppIcons.nest, size: 46, color: AppColors.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -309,7 +310,8 @@ class _LittersViewState extends State<LittersView> {
           children: [
             Row(
               children: [
-                const Text('🍼 ', style: TextStyle(fontSize: 20)),
+                const AppIcon(AppIcons.nest, size: 28, color: AppColors.primary),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Portée de ${mother?.name ?? 'Mère'}',
@@ -538,7 +540,7 @@ class _LittersViewState extends State<LittersView> {
       ),
       child: Column(
         children: [
-          const Text('🧺', style: TextStyle(fontSize: 36)),
+          const AppIcon(AppIcons.nest, size: 56, color: AppColors.primary),
           const SizedBox(height: 10),
           Text(
             noneAtAll

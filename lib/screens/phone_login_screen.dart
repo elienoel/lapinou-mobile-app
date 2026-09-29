@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
+import '../widgets/app_icon.dart';
 
 class PhoneLoginScreen extends StatefulWidget {
   const PhoneLoginScreen({super.key});
@@ -84,7 +85,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                       border: Border.all(color: AppColors.primarySoftBorder, width: 2),
                     ),
                     child: const Center(
-                      child: Text('🐰', style: TextStyle(fontSize: 46)),
+                      child: AppIcon(AppIcons.rabbit, size: 54, color: AppColors.primary),
                     ),
                   ),
                 ),

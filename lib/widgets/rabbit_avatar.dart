@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/rabbit.dart';
 import '../services/api_constants.dart';
 import '../theme/colors.dart';
+import 'app_icon.dart';
 
 class RabbitAvatar extends StatelessWidget {
   final Rabbit rabbit;
@@ -100,6 +101,6 @@ class RabbitAvatar extends StatelessWidget {
   }
 
   Widget _buildEmojiFallback(double size) {
-    return Text('🐰', style: TextStyle(fontSize: size * 0.52));
+    return AppIcon(AppIcons.rabbit, size: size * 0.56, color: AppColors.primary);
   }
 }

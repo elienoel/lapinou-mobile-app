@@ -6,6 +6,7 @@ import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/care_sheets.dart';
+import '../widgets/app_icon.dart';
 
 /// Soins & entretien : rappels des prochains soins, historique des soins effectués
 /// et types de soins (vaccin, vitamine, déparasitant…) avec leur durée de renouvellement.
@@ -282,7 +283,7 @@ class _CareScreenState extends State<CareScreen>
         children: [
           Row(
             children: [
-              _emojiBox(care.category.emoji, colors.bg),
+              _emojiBox(care.category, colors.bg),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -369,7 +370,7 @@ class _CareScreenState extends State<CareScreen>
         children: [
           Row(
             children: [
-              _emojiBox(record.category.emoji, AppColors.primarySoft),
+              _emojiBox(record.category, AppColors.primarySoft),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -465,7 +466,7 @@ class _CareScreenState extends State<CareScreen>
                     child: ListTile(
                       onTap: () => showCareTreatmentSheet(context, existing: t),
                       contentPadding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-                      leading: _emojiBox(t.category.emoji, AppColors.primarySoft),
+                      leading: _emojiBox(t.category, AppColors.primarySoft),
                       title: Text(
                         t.name,
                         style: const TextStyle(fontWeight: FontWeight.w800),
@@ -516,7 +517,7 @@ class _CareScreenState extends State<CareScreen>
     );
   }
 
-  Widget _emojiBox(String emoji, Color background) {
+  Widget _emojiBox(CareCategory category, Color background) {
     return Container(
       width: 44,
       height: 44,
@@ -526,7 +527,7 @@ class _CareScreenState extends State<CareScreen>
         borderRadius: BorderRadius.circular(12),
       ),
       alignment: Alignment.center,
-      child: Text(emoji, style: const TextStyle(fontSize: 22)),
+      child: CareCategoryIcon(category, size: 26, color: AppColors.primary),
     );
   }
 
@@ -562,9 +563,19 @@ class _CareScreenState extends State<CareScreen>
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.cardBorder),
             ),
-            child: Text(
-              '🐰 ${r.name}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AppIcon(AppIcons.rabbit, size: 14, color: AppColors.primary),
+                const SizedBox(width: 5),
+                Text(
+                  r.name,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
       ],

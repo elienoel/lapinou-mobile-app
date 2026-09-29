@@ -201,7 +201,7 @@ void main() {
 
         await tester.tap(find.byKey(const ValueKey('record-treatment')));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('💉 Vaccin VHD2').last);
+        await tester.tap(find.text('Vaccin VHD2').last);
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('record-submit')));
         await tester.pumpAndSettle();
@@ -313,8 +313,8 @@ void main() {
         await _pump(tester, initialTab: 1);
         expect(find.text('Vaccin VHD2'), findsOneWidget);
         expect(find.text('Motif : Prévention VHD'), findsOneWidget);
-        expect(find.text('🐰 Bella'), findsOneWidget);
-        expect(find.text('🐰 Flash'), findsOneWidget);
+        expect(find.text('Bella'), findsOneWidget);
+        expect(find.text('Flash'), findsOneWidget);
         expect(find.textContaining('Prochain soin le'), findsOneWidget);
       }, api.client);
     });

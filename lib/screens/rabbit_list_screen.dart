@@ -11,6 +11,7 @@ import '../services/api_constants.dart';
 import 'add_rabbit_screen.dart';
 import 'cages_screen.dart';
 import 'rabbit_detail_screen.dart';
+import '../widgets/app_icon.dart';
 
 class RabbitListScreen extends StatefulWidget {
   const RabbitListScreen({super.key});
@@ -796,7 +797,9 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
   Widget _buildPlaceholderPhoto(Color bgColor) {
     return Container(
       color: bgColor,
-      child: const Center(child: Text('🐰', style: TextStyle(fontSize: 38))),
+      child: const Center(
+        child: AppIcon(AppIcons.rabbit, size: 46, color: AppColors.primary),
+      ),
     );
   }
 

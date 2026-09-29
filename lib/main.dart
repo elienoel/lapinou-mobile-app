@@ -7,11 +7,13 @@ import 'providers/community_provider.dart';
 import 'providers/chat_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/phone_login_screen.dart';
+import 'services/sync_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
+  SyncService.instance.start();
   runApp(const LapinouApp());
 }
 
@@ -29,6 +31,7 @@ class LapinouApp extends StatelessWidget {
               (_, auth, rabbitProvider) =>
                   (rabbitProvider ?? RabbitProvider())..setToken(auth.token),
         ),
+        ChangeNotifierProvider.value(value: SyncService.instance),
         ChangeNotifierProvider(create: (_) => CommunityProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create: (_) => ChatProvider(),

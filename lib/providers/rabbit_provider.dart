@@ -10,6 +10,9 @@ import '../models/care.dart';
 import '../models/care_event.dart';
 import '../models/finance_transaction.dart';
 import '../services/api_constants.dart';
+import '../services/connectivity_service.dart';
+import '../services/local_database.dart';
+import '../services/sync_service.dart';
 
 class PedigreeNode {
   final Rabbit rabbit;
@@ -41,8 +44,10 @@ class RabbitProvider extends ChangeNotifier {
   void setToken(String? token) {
     if (_token != token) {
       _token = token;
+      SyncService.instance.setToken(token);
       if (token != null && token.isNotEmpty) {
         fetchAll(token: token);
+        SyncService.instance.syncNow();
       }
     }
   }
@@ -142,10 +147,17 @@ class RabbitProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 1. Lapins (CRUD)
+  /// 1. Lapins (CRUD) — disponible hors-ligne : lecture et écriture passent par la
+  /// base locale, la synchronisation avec le serveur se fait en tâche de fond dès
+  /// qu'une connexion est disponible (voir [SyncService]).
   Future<void> fetchRabbits({String? token}) async {
+    final local = await LocalDatabase.instance.getAll(SyncEntity.rabbit);
+    _rabbits = local.map((r) => Rabbit.fromJson(r.data)).toList();
+    notifyListeners();
+
     final t = token ?? _token;
     if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
 
     try {
       final response = await http.get(
@@ -158,11 +170,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        if (list.isNotEmpty) {
-          _rabbits = list.map((item) => Rabbit.fromJson(item)).toList();
-          notifyListeners();
-        }
-        _rabbits = list.map((item) => Rabbit.fromJson(item)).toList();
+        await LocalDatabase.instance.replaceFromServer(
+          SyncEntity.rabbit,
+          [for (final item in list) Map<String, dynamic>.from(item)],
+        );
+        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.rabbit);
+        _rabbits = refreshed.map((r) => Rabbit.fromJson(r.data)).toList();
         notifyListeners();
       }
     } catch (e) {
@@ -179,40 +192,29 @@ class RabbitProvider extends ChangeNotifier {
     _rabbits.insert(0, rabbit);
     notifyListeners();
 
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
+    await SyncService.instance.recordCreate(SyncEntity.rabbit, rabbit.id, rabbit.toJson());
 
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConstants.rabbitsUrl),
-        headers: _headers(t),
-        body: jsonEncode(rabbit.toJson()),
-      );
-      if (response.statusCode == 201) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final created = Rabbit.fromJson(body['data']);
-        final idx = _rabbits.indexWhere((r) => r.id == rabbit.id);
-        if (idx != -1) {
-          _rabbits[idx] = created;
-          notifyListeners();
-        }
-
-        // Si une photo a été fournie lors de la création, la téléverser
-        if (photoFile != null) {
-          await uploadRabbitPhoto(
-            created.id,
-            photoFile,
-            isPrimary: true,
-            token: t,
-          );
-        }
-
-        return true;
+    // Si la synchronisation a eu lieu immédiatement (en ligne), l'id temporaire a été
+    // remplacé par l'id serveur : on aligne la liste en mémoire et on peut envoyer la photo.
+    final refreshed = await LocalDatabase.instance.getAll(SyncEntity.rabbit);
+    final confirmed = refreshed.where(
+      (r) => r.localId != rabbit.id && r.data['tag_number'] == rabbit.tagNumber,
+    );
+    if (confirmed.isNotEmpty) {
+      final created = Rabbit.fromJson(confirmed.first.data);
+      final idx = _rabbits.indexWhere((r) => r.id == rabbit.id);
+      if (idx != -1) {
+        _rabbits[idx] = created;
+        notifyListeners();
       }
-    } catch (e) {
-      debugPrint('Error creating rabbit: $e');
+      if (photoFile != null) {
+        final t = token ?? _token;
+        if (t != null && t.isNotEmpty) {
+          await uploadRabbitPhoto(created.id, photoFile, isPrimary: true, token: t);
+        }
+      }
     }
-    return false;
+    return true;
   }
 
   Future<bool> uploadRabbitPhoto(
@@ -338,49 +340,15 @@ class RabbitProvider extends ChangeNotifier {
       _rabbits[index] = rabbit;
       notifyListeners();
     }
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
-
-    try {
-      final response = await http.patch(
-        Uri.parse(ApiConstants.rabbitDetailUrl(rabbit.id)),
-        headers: _headers(t),
-        body: jsonEncode(rabbit.toJson()),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final updated = Rabbit.fromJson(body['data']);
-        final idx = _rabbits.indexWhere((r) => r.id == rabbit.id);
-        if (idx != -1) {
-          _rabbits[idx] = updated;
-          notifyListeners();
-        }
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Error updating rabbit: $e');
-    }
-    return false;
+    await SyncService.instance.recordUpdate(SyncEntity.rabbit, rabbit.id, rabbit.toJson());
+    return true;
   }
 
   Future<bool> deleteRabbit(String id, {String? token}) async {
     _rabbits.removeWhere((r) => r.id == id);
     notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
-
-    try {
-      final response = await http.delete(
-        Uri.parse(ApiConstants.rabbitDetailUrl(id)),
-        headers: _headers(t),
-      );
-      return response.statusCode == 204 || response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Error deleting rabbit: $e');
-    }
-    return false;
+    await SyncService.instance.recordDelete(SyncEntity.rabbit, id);
+    return true;
   }
 
   /// Cages (CRUD) et occupation des loges
@@ -393,8 +361,13 @@ class RabbitProvider extends ChangeNotifier {
   }
 
   Future<void> fetchCages({String? token}) async {
+    final local = await LocalDatabase.instance.getAll(SyncEntity.cage);
+    _cages = local.map((c) => Cage.fromJson(c.data)).toList();
+    notifyListeners();
+
     final t = token ?? _token;
     if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
 
     try {
       final response = await http.get(
@@ -404,7 +377,12 @@ class RabbitProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final body = jsonDecode(utf8.decode(response.bodyBytes));
         final List list = body['data'] is List ? body['data'] : [];
-        _cages = list.map((item) => Cage.fromJson(item)).toList();
+        await LocalDatabase.instance.replaceFromServer(
+          SyncEntity.cage,
+          [for (final item in list) Map<String, dynamic>.from(item)],
+        );
+        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.cage);
+        _cages = refreshed.map((c) => Cage.fromJson(c.data)).toList();
         notifyListeners();
       }
     } catch (e) {
@@ -412,89 +390,65 @@ class RabbitProvider extends ChangeNotifier {
     }
   }
 
+  /// Crée ou modifie les attributs d'une cage (nom, taille, emplacement). Fonctionne
+  /// hors-ligne ; l'occupation détaillée des loges (calculée par le serveur) ne se
+  /// rafraîchit qu'au retour de connexion.
   /// Retourne null en cas de succès, sinon le message d'erreur à afficher.
   Future<String?> saveCage(
     Cage cage, {
     bool isNew = true,
     String? token,
   }) async {
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return 'Session expirée';
-
-    try {
-      final response =
-          isNew
-              ? await http.post(
-                Uri.parse(ApiConstants.cagesUrl),
-                headers: _headers(t),
-                body: jsonEncode(cage.toJson()),
-              )
-              : await http.patch(
-                Uri.parse(ApiConstants.cageDetailUrl(cage.id)),
-                headers: _headers(t),
-                body: jsonEncode(cage.toJson()),
-              );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchCages(token: t);
-        return null;
-      }
-      return _extractError(response);
-    } catch (e) {
-      debugPrint('Error saving cage: $e');
-      return 'Impossible de joindre le serveur';
+    if (isNew) {
+      final localId = 'cage-${DateTime.now().millisecondsSinceEpoch}';
+      await SyncService.instance.recordCreate(SyncEntity.cage, localId, cage.toJson());
+    } else {
+      await SyncService.instance.recordUpdate(SyncEntity.cage, cage.id, cage.toJson());
     }
+    await fetchCages(token: token);
+    return null;
   }
 
   Future<bool> deleteCage(String id, {String? token}) async {
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return false;
-
-    try {
-      final response = await http.delete(
-        Uri.parse(ApiConstants.cageDetailUrl(id)),
-        headers: _headers(t),
-      );
-      if (response.statusCode == 204 || response.statusCode == 200) {
-        // Les lapins de la cage supprimée sont désormais sans cage.
-        await Future.wait([fetchCages(token: t), fetchRabbits(token: t)]);
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Error deleting cage: $e');
-    }
-    return false;
+    _cages.removeWhere((c) => c.id == id);
+    notifyListeners();
+    await SyncService.instance.recordDelete(SyncEntity.cage, id);
+    return true;
   }
 
   /// Place un lapin dans une loge (ou le retire de sa cage si [cageId] est null).
-  /// Retourne null en cas de succès, sinon le message d'erreur à afficher.
+  /// Fonctionne hors-ligne (la capacité de la cage est vérifiée sur les données déjà
+  /// en cache). Retourne null en cas de succès, sinon le message d'erreur à afficher.
   Future<String?> assignRabbitToCompartment(
     String rabbitId, {
     String? cageId,
     int? compartmentNumber,
     String? token,
   }) async {
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return 'Session expirée';
-
-    try {
-      final response = await http.patch(
-        Uri.parse(ApiConstants.rabbitDetailUrl(rabbitId)),
-        headers: _headers(t),
-        body: jsonEncode({
-          'cage': cageId == null ? null : int.tryParse(cageId),
-          'compartment_number': cageId == null ? null : compartmentNumber,
-          if (cageId == null) 'cage_number': 'Non assigné',
-        }),
-      );
-      if (response.statusCode == 200) {
-        await Future.wait([fetchRabbits(token: t), fetchCages(token: t)]);
-        return null;
+    if (cageId != null) {
+      final cage = getCageById(cageId);
+      if (cage == null) return 'Cette cage est introuvable.';
+      if (compartmentNumber == null || compartmentNumber < 1 || compartmentNumber > cage.compartmentsCount) {
+        return 'La cage ${cage.name} possède ${cage.compartmentsCount} loge(s).';
       }
-      return _extractError(response);
-    } catch (e) {
-      debugPrint('Error assigning rabbit to compartment: $e');
-      return 'Impossible de joindre le serveur';
     }
+
+    final rabbit = getRabbitById(rabbitId);
+    if (rabbit == null) return 'Ce lapin est introuvable.';
+    final cageName = cageId == null ? null : getCageById(cageId)?.name;
+    final updated = rabbit.copyWith(
+      cageId: cageId,
+      compartmentNumber: cageId == null ? null : compartmentNumber,
+      cageNumber: cageId == null ? 'Non assigné' : '$cageName-$compartmentNumber',
+      clearCage: cageId == null,
+    );
+    final idx = _rabbits.indexWhere((r) => r.id == rabbitId);
+    if (idx != -1) {
+      _rabbits[idx] = updated;
+      notifyListeners();
+    }
+    await SyncService.instance.recordUpdate(SyncEntity.rabbit, rabbitId, updated.toJson());
+    return null;
   }
 
   String _extractError(http.Response response) {
@@ -513,8 +467,13 @@ class RabbitProvider extends ChangeNotifier {
 
   /// 2. Accouplements (Saillies)
   Future<void> fetchMatings({String? token}) async {
+    final local = await LocalDatabase.instance.getAll(SyncEntity.mating);
+    _matings = local.map((m) => Mating.fromJson(m.data)).toList();
+    notifyListeners();
+
     final t = token ?? _token;
     if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
 
     try {
       final response = await http.get(
@@ -527,11 +486,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        if (list.isNotEmpty) {
-          _matings = list.map((item) => Mating.fromJson(item)).toList();
-          notifyListeners();
-        }
-        _matings = list.map((item) => Mating.fromJson(item)).toList();
+        await LocalDatabase.instance.replaceFromServer(
+          SyncEntity.mating,
+          [for (final item in list) Map<String, dynamic>.from(item)],
+        );
+        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.mating);
+        _matings = refreshed.map((m) => Mating.fromJson(m.data)).toList();
         notifyListeners();
       }
     } catch (e) {
@@ -543,79 +503,24 @@ class RabbitProvider extends ChangeNotifier {
     _matings.insert(0, mating);
     _setLocalRabbitStatus(mating.femaleId, RabbitStatus.pregnant);
     notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
-
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConstants.matingsUrl),
-        headers: _headers(t),
-        body: jsonEncode(mating.toJson()),
-      );
-      if (response.statusCode == 201) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final created = Mating.fromJson(body['data']);
-        final idx = _matings.indexWhere((m) => m.id == mating.id);
-        if (idx != -1) {
-          _matings[idx] = created;
-          notifyListeners();
-        }
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Error creating mating: $e');
-    }
-    return false;
+    await SyncService.instance.recordCreate(SyncEntity.mating, mating.id, mating.toJson());
+    return true;
   }
 
   /// Modifie un accouplement (mâle, femelle, date de saillie, statut, notes).
-  /// Le backend recalcule les échéances et resynchronise le statut des femelles.
+  /// En ligne, le backend recalcule aussi les échéances et le statut des femelles ;
+  /// hors-ligne, ces recalculs se feront à la prochaine synchronisation.
   Future<bool> updateMating(Mating mating, {String? token}) async {
     final index = _matings.indexWhere((m) => m.id == mating.id);
-    final previous = index != -1 ? _matings[index] : null;
     if (index != -1) {
       _matings[index] = mating;
       notifyListeners();
     }
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
-
-    try {
-      final response = await http.patch(
-        Uri.parse(ApiConstants.matingDetailUrl(mating.id)),
-        headers: _headers(t),
-        body: jsonEncode(mating.toJson()),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final updated = Mating.fromJson(body['data']);
-        final idx = _matings.indexWhere((m) => m.id == mating.id);
-        if (idx != -1) {
-          _matings[idx] = updated;
-          notifyListeners();
-        }
-        // Les statuts des femelles concernées ont pu changer côté serveur
-        await fetchRabbits(token: t);
-        return true;
-      }
-      debugPrint(
-        'Error updating mating ${response.statusCode}: ${response.body}',
-      );
-    } catch (e) {
-      debugPrint('Error updating mating: $e');
+    await SyncService.instance.recordUpdate(SyncEntity.mating, mating.id, mating.toJson());
+    if (await ConnectivityService.instance.isOnline()) {
+      await fetchRabbits(token: token);
     }
-
-    // Échec : restaurer l'état précédent
-    if (previous != null) {
-      final idx = _matings.indexWhere((m) => m.id == mating.id);
-      if (idx != -1) {
-        _matings[idx] = previous;
-        notifyListeners();
-      }
-    }
-    return false;
+    return true;
   }
 
   /// Confirme que la palpation a été effectuée (gestation confirmée) à la date [doneAt].
@@ -705,8 +610,13 @@ class RabbitProvider extends ChangeNotifier {
 
   /// 3. Mises bas (Portées)
   Future<void> fetchLitters({String? token}) async {
+    final local = await LocalDatabase.instance.getAll(SyncEntity.litter);
+    _litters = local.map((l) => Litter.fromJson(l.data)).toList();
+    notifyListeners();
+
     final t = token ?? _token;
     if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
 
     try {
       final response = await http.get(
@@ -719,11 +629,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        if (list.isNotEmpty) {
-          _litters = list.map((item) => Litter.fromJson(item)).toList();
-          notifyListeners();
-        }
-        _litters = list.map((item) => Litter.fromJson(item)).toList();
+        await LocalDatabase.instance.replaceFromServer(
+          SyncEntity.litter,
+          [for (final item in list) Map<String, dynamic>.from(item)],
+        );
+        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.litter);
+        _litters = refreshed.map((l) => Litter.fromJson(l.data)).toList();
         notifyListeners();
       }
     } catch (e) {
@@ -742,40 +653,17 @@ class RabbitProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
-
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConstants.littersUrl),
-        headers: _headers(t),
-        body: jsonEncode(litter.toJson()),
-      );
-      if (response.statusCode == 201) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final created = Litter.fromJson(body['data']);
-        final idx = _litters.indexWhere((l) => l.id == litter.id);
-        if (idx != -1) {
-          _litters[idx] = created;
-          notifyListeners();
-        }
-        // Le backend a mis à jour l'accouplement (mise bas réalisée) et la mère
-        await Future.wait([
-          fetchMatings(token: t),
-          fetchRabbits(token: t),
-          fetchCages(token: t),
-        ]);
-        return true;
-      }
-      debugPrint(
-        'Error creating litter ${response.statusCode}: ${response.body}',
-      );
-    } catch (e) {
-      debugPrint('Error creating litter: $e');
+    await SyncService.instance.recordCreate(SyncEntity.litter, litter.id, litter.toJson());
+    // Une fois synchronisé, le backend a mis à jour l'accouplement (mise bas
+    // réalisée) et la mère ; on rafraîchit pour refléter ces recalculs.
+    if (await ConnectivityService.instance.isOnline()) {
+      await Future.wait([
+        fetchMatings(token: token),
+        fetchRabbits(token: token),
+        fetchCages(token: token),
+      ]);
     }
-    // Échec : resynchroniser pour annuler la mise à jour optimiste
-    await fetchAll(token: t);
-    return false;
+    return true;
   }
 
   /// Corrige une portée (effectifs, morts au nid, date de sevrage prévue, notes).
@@ -863,8 +751,13 @@ class RabbitProvider extends ChangeNotifier {
 
   /// 4. Soins et Vaccinations
   Future<void> fetchCareEvents({String? token}) async {
+    final local = await LocalDatabase.instance.getAll(SyncEntity.careEvent);
+    _careEvents = local.map((c) => CareEvent.fromJson(c.data)).toList();
+    notifyListeners();
+
     final t = token ?? _token;
     if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
 
     try {
       final response = await http.get(
@@ -877,11 +770,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        if (list.isNotEmpty) {
-          _careEvents = list.map((item) => CareEvent.fromJson(item)).toList();
-          notifyListeners();
-        }
-        _careEvents = list.map((item) => CareEvent.fromJson(item)).toList();
+        await LocalDatabase.instance.replaceFromServer(
+          SyncEntity.careEvent,
+          [for (final item in list) Map<String, dynamic>.from(item)],
+        );
+        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.careEvent);
+        _careEvents = refreshed.map((c) => CareEvent.fromJson(c.data)).toList();
         notifyListeners();
       }
     } catch (e) {
@@ -892,36 +786,23 @@ class RabbitProvider extends ChangeNotifier {
   Future<bool> addCareEvent(CareEvent event, {String? token}) async {
     _careEvents.insert(0, event);
     notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
-
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConstants.careEventsUrl),
-        headers: _headers(t),
-        body: jsonEncode(event.toJson()),
-      );
-      if (response.statusCode == 201) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final created = CareEvent.fromJson(body['data']);
-        final idx = _careEvents.indexWhere((c) => c.id == event.id);
-        if (idx != -1) {
-          _careEvents[idx] = created;
-          notifyListeners();
-        }
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Error creating care event: $e');
-    }
-    return false;
+    await SyncService.instance.recordCreate(SyncEntity.careEvent, event.id, event.toJson());
+    return true;
   }
 
   /// Soins & entretien : types de soins, soins effectués et rappels des prochains soins.
+  /// Types de soins et historique sont disponibles hors-ligne ; les rappels à venir
+  /// (calculés par le serveur) nécessitent une connexion.
   Future<void> fetchCare({String? token}) async {
+    final localTreatments = await LocalDatabase.instance.getAll(SyncEntity.careTreatment);
+    _careTreatments = localTreatments.map((c) => CareTreatment.fromJson(c.data)).toList();
+    final localRecords = await LocalDatabase.instance.getAll(SyncEntity.careRecord);
+    _careRecords = localRecords.map((c) => CareRecord.fromJson(c.data)).toList();
+    notifyListeners();
+
     final t = token ?? _token;
     if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
 
     Future<List?> load(String url) async {
       try {
@@ -941,16 +822,20 @@ class RabbitProvider extends ChangeNotifier {
       load(ApiConstants.careUpcomingUrl),
     ]);
     if (results[0] != null) {
-      _careTreatments = [
-        for (final j in results[0]!)
-          CareTreatment.fromJson(Map<String, dynamic>.from(j)),
-      ];
+      await LocalDatabase.instance.replaceFromServer(
+        SyncEntity.careTreatment,
+        [for (final j in results[0]!) Map<String, dynamic>.from(j)],
+      );
+      final refreshed = await LocalDatabase.instance.getAll(SyncEntity.careTreatment);
+      _careTreatments = refreshed.map((c) => CareTreatment.fromJson(c.data)).toList();
     }
     if (results[1] != null) {
-      _careRecords = [
-        for (final j in results[1]!)
-          CareRecord.fromJson(Map<String, dynamic>.from(j)),
-      ];
+      await LocalDatabase.instance.replaceFromServer(
+        SyncEntity.careRecord,
+        [for (final j in results[1]!) Map<String, dynamic>.from(j)],
+      );
+      final refreshed = await LocalDatabase.instance.getAll(SyncEntity.careRecord);
+      _careRecords = refreshed.map((c) => CareRecord.fromJson(c.data)).toList();
     }
     if (results[2] != null) {
       _upcomingCares = [
@@ -961,7 +846,8 @@ class RabbitProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Crée ou modifie (si [id] est fourni) un type de soin.
+  /// Crée ou modifie (si [id] est fourni) un type de soin. Fonctionne hors-ligne ;
+  /// l'unicité du nom n'est alors vérifiée qu'à la prochaine synchronisation.
   /// Retourne null en cas de succès, sinon le message d'erreur à afficher.
   Future<String?> saveCareTreatment({
     String? id,
@@ -971,36 +857,20 @@ class RabbitProvider extends ChangeNotifier {
     String? notes,
     String? token,
   }) async {
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return 'Session expirée';
-    try {
-      final body = jsonEncode({
-        'name': name,
-        'category': category.apiValue,
-        'renewal_days': renewalDays,
-        'notes': notes,
-      });
-      final response =
-          id == null
-              ? await http.post(
-                Uri.parse(ApiConstants.careTreatmentsUrl),
-                headers: _headers(t),
-                body: body,
-              )
-              : await http.patch(
-                Uri.parse(ApiConstants.careTreatmentDetailUrl(id)),
-                headers: _headers(t),
-                body: body,
-              );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchCare(token: t);
-        return null;
-      }
-      return _extractError(response);
-    } catch (e) {
-      debugPrint('Error saving care treatment: $e');
-      return 'Impossible de joindre le serveur';
+    final payload = {
+      'name': name,
+      'category': category.apiValue,
+      'renewal_days': renewalDays,
+      'notes': notes,
+    };
+    if (id == null) {
+      final localId = 'trt-${DateTime.now().millisecondsSinceEpoch}';
+      await SyncService.instance.recordCreate(SyncEntity.careTreatment, localId, payload);
+    } else {
+      await SyncService.instance.recordUpdate(SyncEntity.careTreatment, id, payload);
     }
+    await fetchCare(token: token);
+    return null;
   }
 
   /// Supprime un type de soin jamais utilisé. Retourne null en cas de succès, sinon le motif du refus.
@@ -1035,62 +905,38 @@ class RabbitProvider extends ChangeNotifier {
     String? notes,
     String? token,
   }) async {
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return 'Session expirée';
-    try {
-      final body = jsonEncode({
-        'treatment': int.tryParse(treatmentId) ?? treatmentId,
-        'rabbits': [for (final r in rabbitIds) int.tryParse(r) ?? r],
-        'date': isoDate(date),
-        'purpose': purpose,
-        'notes': notes,
-      });
-      final response =
-          id == null
-              ? await http.post(
-                Uri.parse(ApiConstants.careRecordsUrl),
-                headers: _headers(t),
-                body: body,
-              )
-              : await http.patch(
-                Uri.parse(ApiConstants.careRecordDetailUrl(id)),
-                headers: _headers(t),
-                body: body,
-              );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchCare(token: t);
-        return null;
-      }
-      return _extractError(response);
-    } catch (e) {
-      debugPrint('Error saving care record: $e');
-      return 'Impossible de joindre le serveur';
+    final payload = {
+      'treatment': int.tryParse(treatmentId) ?? treatmentId,
+      'rabbits': [for (final r in rabbitIds) int.tryParse(r) ?? r],
+      'date': isoDate(date),
+      'purpose': purpose,
+      'notes': notes,
+    };
+    if (id == null) {
+      final localId = 'crd-${DateTime.now().millisecondsSinceEpoch}';
+      await SyncService.instance.recordCreate(SyncEntity.careRecord, localId, payload);
+    } else {
+      await SyncService.instance.recordUpdate(SyncEntity.careRecord, id, payload);
     }
+    await fetchCare(token: token);
+    return null;
   }
 
   Future<String?> deleteCareRecord(String id, {String? token}) async {
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return 'Session expirée';
-    try {
-      final response = await http.delete(
-        Uri.parse(ApiConstants.careRecordDetailUrl(id)),
-        headers: _headers(t),
-      );
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        await fetchCare(token: t);
-        return null;
-      }
-      return _extractError(response);
-    } catch (e) {
-      debugPrint('Error deleting care record: $e');
-      return 'Impossible de joindre le serveur';
-    }
+    await SyncService.instance.recordDelete(SyncEntity.careRecord, id);
+    await fetchCare(token: token);
+    return null;
   }
 
   /// 5. Finances
   Future<void> fetchFinances({String? token}) async {
+    final local = await LocalDatabase.instance.getAll(SyncEntity.finance);
+    _finances = local.map((f) => FinanceTransaction.fromJson(f.data)).toList();
+    notifyListeners();
+
     final t = token ?? _token;
     if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
 
     try {
       final response = await http.get(
@@ -1104,13 +950,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        if (list.isNotEmpty) {
-          _finances =
-              list.map((item) => FinanceTransaction.fromJson(item)).toList();
-          notifyListeners();
-        }
-        _finances =
-            list.map((item) => FinanceTransaction.fromJson(item)).toList();
+        await LocalDatabase.instance.replaceFromServer(
+          SyncEntity.finance,
+          [for (final item in list) Map<String, dynamic>.from(item)],
+        );
+        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.finance);
+        _finances = refreshed.map((f) => FinanceTransaction.fromJson(f.data)).toList();
         notifyListeners();
       }
     } catch (e) {
@@ -1124,30 +969,8 @@ class RabbitProvider extends ChangeNotifier {
   }) async {
     _finances.insert(0, transaction);
     notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return true;
-
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConstants.financesUrl),
-        headers: _headers(t),
-        body: jsonEncode(transaction.toJson()),
-      );
-      if (response.statusCode == 201) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final created = FinanceTransaction.fromJson(body['data']);
-        final idx = _finances.indexWhere((f) => f.id == transaction.id);
-        if (idx != -1) {
-          _finances[idx] = created;
-          notifyListeners();
-        }
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Error creating finance transaction: $e');
-    }
-    return false;
+    await SyncService.instance.recordCreate(SyncEntity.finance, transaction.id, transaction.toJson());
+    return true;
   }
 
   List<Rabbit> getEligibleFathers({String? excludeId}) {

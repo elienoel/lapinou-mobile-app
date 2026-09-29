@@ -8,6 +8,7 @@ import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/litter_form.dart';
 import 'litters_screen.dart';
+import '../widgets/app_icon.dart';
 
 enum _MatingFilter { active, finished, all }
 
@@ -846,7 +847,8 @@ class _MatingsScreenState extends State<MatingsScreen>
         children: [
           Row(
             children: [
-              const Text('🐰 ', style: TextStyle(fontSize: 18)),
+              const AppIcon(AppIcons.mating, size: 30, color: AppColors.primary),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${female?.name ?? 'Femelle'} x ${male?.name ?? 'Mâle'}',

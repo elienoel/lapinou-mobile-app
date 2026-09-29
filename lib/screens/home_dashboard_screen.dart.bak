@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/care.dart';
 import '../models/currency.dart';
 import '../providers/auth_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
-import '../theme/radius.dart';
 import '../widgets/author_avatar.dart';
 import '../widgets/chat_icon_button.dart';
 import 'main_navigation_screen.dart';
 import 'rabbit_list_screen.dart';
 import 'matings_screen.dart';
-import 'care_screen.dart';
-import '../widgets/app_icon.dart';
+import 'finances_screen.dart';
+import 'community_feed_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
@@ -91,20 +89,30 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       currency,
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 26),
 
                     // 3. Section "Menu Principal" (Les cards du menu)
+                    const Text(
+                      'Menu Principal',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
 
                     // Card 1: Mes lapins
                     _buildMenuCard(
                       context: context,
-                      icon: AppIcons.rabbit,
+                      icon: '🐰',
                       title: 'Mes lapins',
                       subtitle:
                           'Cheptel, cages et loges, reproducteurs, arbres généalogiques',
                       badge: '${provider.totalRabbitsCount} lapins',
-                      badgeColor: AppColors.primarySoft,
-                      badgeTextColor: AppColors.primary,
+                      badgeColor: AppColors.mintBackground,
+                      badgeTextColor: AppColors.primaryGreen,
                       onTap: () {
                         Navigator.push(
                           context,
@@ -115,10 +123,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       },
                     ),
 
-                    // Card 2: Accouplements & Mises bas
+                    // Card 2: Accouplements
                     _buildMenuCard(
                       context: context,
-                      icon: AppIcons.mating,
+                      icon: '❤️',
                       title: 'Accouplements & Mises bas',
                       subtitle:
                           'Saillies, palpation, mises bas et sevrage des lapereaux',
@@ -141,31 +149,70 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       },
                     ),
 
-                    // Card 3: Soins & entretien
+                    // Card 4: Dépenses
                     _buildMenuCard(
                       context: context,
-                      icon: AppIcons.syringe,
-                      title: 'Soins & entretien',
+                      icon: '📦',
+                      title: 'Dépenses',
                       subtitle:
-                          'Vaccins, vitamines, déparasitants, historique des soins et rappels',
-                      badge: _careBadge(provider),
-                      badgeColor:
-                          provider.pendingCareCount > 0
-                              ? AppColors.statusAlertBg
-                              : AppColors.primarySoft,
-                      badgeTextColor:
-                          provider.pendingCareCount > 0
-                              ? AppColors.statusAlertText
-                              : AppColors.primary,
+                          'Alimentation, foin, granulés, vaccins, soins & matériel',
+                      badge: currency.format(-totalExpense, showSign: true),
+                      badgeColor: AppColors.statusAlertBg,
+                      badgeTextColor: Colors.red.shade700,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const CareScreen(),
+                            builder:
+                                (context) =>
+                                    const FinancesScreen(initialFilterIndex: 1),
                           ),
                         );
                       },
                     ),
+
+                    // Card 5: Ventes
+                    _buildMenuCard(
+                      context: context,
+                      icon: '💰',
+                      title: 'Ventes',
+                      subtitle:
+                          'Recettes ventes reproducteurs, lapereaux, viande & engrais',
+                      badge: currency.format(totalIncome, showSign: true),
+                      badgeColor: AppColors.statusActiveBg,
+                      badgeTextColor: AppColors.statusActiveText,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) =>
+                                    const FinancesScreen(initialFilterIndex: 2),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Card 6: Communauté & Fil d'actualité
+                    _buildMenuCard(
+                      context: context,
+                      icon: '💬',
+                      title: 'Communauté d\'éleveurs',
+                      subtitle:
+                          'Fil d\'actualité, partage d\'expériences, conseils & entraide',
+                      badge: 'En direct',
+                      badgeColor: AppColors.mintBackground,
+                      badgeTextColor: AppColors.primaryGreen,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CommunityFeedScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
                     const SizedBox(height: 30),
                   ],
                 ),
@@ -175,31 +222,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         );
       },
     );
-  }
-
-  /// Badge de la carte « Soins & entretien » : ce qu'il faut faire en priorité.
-  String _careBadge(RabbitProvider provider) {
-    final overdue =
-        provider.upcomingCares.where((c) => c.status == DueStatus.overdue).length;
-    if (overdue > 0) return '$overdue en retard';
-    if (provider.pendingCareCount > 0) {
-      return '${provider.pendingCareCount} à faire';
-    }
-    return 'À jour';
-  }
-
-  String _careDetail(RabbitProvider provider) {
-    final overdue =
-        provider.upcomingCares.where((c) => c.status == DueStatus.overdue).length;
-    if (overdue > 0) return '$overdue en retard';
-    if (provider.pendingCareCount > 0) return 'À faire cette semaine';
-    return 'Aucun soin en retard';
-  }
-
-  /// Pictogramme d'une carte : une icône vectorielle [AppIcons], ou un emoji (texte).
-  Widget _iconOf(Object icon, {required double size, required Color color}) {
-    if (icon is AppIcons) return AppIcon(icon, size: size, color: color);
-    return Text('$icon', style: TextStyle(fontSize: size * 0.85));
   }
 
   Widget _buildTopHeader(BuildContext context) {
@@ -286,7 +308,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           // Stat Card 1: Cheptel total (Highlighted green card)
           _buildActivityStatCard(
             isHighlighted: true,
-            icon: AppIcons.rabbit,
+            icon: '🐰',
             value: '${provider.totalRabbitsCount}',
             label: 'Cheptel total',
             detail: '${provider.males.length} ♂ • ${provider.females.length} ♀',
@@ -306,7 +328,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
           // Stat Card 3: Lapereaux au nid
           _buildActivityStatCard(
-            icon: AppIcons.nest,
+            icon: '🍼',
             value: '${provider.totalKitsInNests}',
             label: 'Lapereaux',
             detail: '${provider.litters.length} portée(s) active(s)',
@@ -316,10 +338,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
           // Stat Card 4: Soins dus
           _buildActivityStatCard(
-            icon: AppIcons.syringe,
+            icon: '💉',
             value: '${provider.pendingCareCount}',
             label: 'Soins dus',
-            detail: _careDetail(provider),
+            detail: 'Vaccins & contrôles',
             badge: 'Sanitaire',
           ),
           const SizedBox(width: 12),
@@ -338,7 +360,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   Widget _buildActivityStatCard({
-    required Object icon,
+    required String icon,
     required String value,
     required String label,
     required String detail,
@@ -349,10 +371,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       width: 165,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isHighlighted ? AppColors.primary : Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        color: isHighlighted ? AppColors.primaryGreen : Colors.white,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isHighlighted ? AppColors.primary : AppColors.cardBorder,
+          color: isHighlighted ? AppColors.primaryGreen : AppColors.cardBorder,
         ),
         boxShadow: [
           BoxShadow(
@@ -368,11 +390,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _iconOf(
-                icon,
-                size: 26,
-                color: isHighlighted ? Colors.white : AppColors.primary,
-              ),
+              Text(icon, style: const TextStyle(fontSize: 22)),
               const SizedBox(width: 6),
               Flexible(
                 child: Container(
@@ -383,12 +401,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   decoration: BoxDecoration(
                     color:
                         isHighlighted
-                            ? Colors.white
-                            : AppColors.primarySoft,
-                    border: Border.all(
-                      color:
-                          isHighlighted ? Colors.white : AppColors.primary,
-                    ),
+                            ? Colors.white.withAlpha(45)
+                            : AppColors.mintBackground,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -398,7 +412,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color:
+                          isHighlighted ? Colors.white : AppColors.primaryGreen,
                     ),
                   ),
                 ),
@@ -446,7 +461,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   Widget _buildMenuCard({
     required BuildContext context,
-    required Object icon,
+    required String icon,
     required String title,
     required String subtitle,
     required String badge,
@@ -458,7 +473,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
@@ -470,7 +485,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: BorderRadius.circular(18),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -481,11 +496,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 height: 52,
                 decoration: BoxDecoration(
                   color: badgeColor,
-                  border: Border.all(color: AppColors.cardBorder),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
-                child: _iconOf(icon, size: 32, color: AppColors.primary),
+                child: Text(icon, style: const TextStyle(fontSize: 26)),
               ),
               const SizedBox(width: 14),
 
@@ -515,7 +529,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: badgeColor,
-                            border: Border.all(color: badgeTextColor),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(

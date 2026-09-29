@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../services/api_constants.dart';
 import '../theme/colors.dart';
+import '../widgets/app_icon.dart';
 
 class AddRabbitScreen extends StatefulWidget {
   final Rabbit? initialRabbitToEdit;
@@ -505,18 +506,18 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                                           errorBuilder:
                                               (context, error, stackTrace) =>
                                                   const Center(
-                                                    child: Text(
-                                                      '🐰',
-                                                      style: TextStyle(
-                                                        fontSize: 48,
-                                                      ),
+                                                    child: AppIcon(
+                                                      AppIcons.rabbit,
+                                                      size: 56,
+                                                      color: AppColors.primary,
                                                     ),
                                                   ),
                                         )
                                         : const Center(
-                                          child: Text(
-                                            '🐰',
-                                            style: TextStyle(fontSize: 48),
+                                          child: AppIcon(
+                                            AppIcons.rabbit,
+                                            size: 56,
+                                            color: AppColors.primary,
                                           ),
                                         ),
                               ),
