@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 class ApiConstants {
   // Détection intelligente de l'adresse selon la plateforme
   static String get baseUrl {
+    if (kReleaseMode) {
+      return 'https://api.lapinou.elienoel.dev/api';
+    }
     if (kIsWeb) {
       return 'http://localhost:8000/api';
     }

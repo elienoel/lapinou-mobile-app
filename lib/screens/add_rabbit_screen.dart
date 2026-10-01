@@ -26,12 +26,12 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   late TextEditingController _nameController;
   late TextEditingController _tagController;
   late TextEditingController _cageController;
-  late TextEditingController _colorController;
   late TextEditingController _weightController;
   late TextEditingController _notesController;
 
   RabbitGender _selectedGender = RabbitGender.female;
   String _selectedBreed = 'Fauve de Bourgogne';
+  late String _selectedColor;
   RabbitStatus _selectedStatus = RabbitStatus.active;
   DateTime _birthDate = DateTime.now().subtract(const Duration(days: 180));
   String? _selectedFatherId;
@@ -56,14 +56,27 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     'Autre / Croisé',
   ];
 
+  static const List<(String, Color)> _coatColors = [
+    ('Fauve', Color(0xFFC97A3D)),
+    ('Blanc', Color(0xFFF5F5F5)),
+    ('Noir', Color(0xFF1A1A1A)),
+    ('Gris', Color(0xFF9E9E9E)),
+    ('Bleu', Color(0xFF6E7C8C)),
+    ('Havane', Color(0xFF6B4226)),
+    ('Chinchilla', Color(0xFFB0B7BF)),
+    ('Isabelle', Color(0xFFE8D5A9)),
+    ('Loutre', Color(0xFF5C4033)),
+    ('Marron', Color(0xFF7B3F00)),
+    ('Roux', Color(0xFFA0522D)),
+    ('Bicolore', Color(0xFFBDBDBD)),
+  ];
+
   @override
   void initState() {
     super.initState();
     final edit = widget.initialRabbitToEdit;
     _nameController = TextEditingController(text: edit?.name ?? '');
-    _tagController = TextEditingController(text: edit?.tagNumber ?? '');
     _cageController = TextEditingController(text: edit?.cageNumber ?? '');
-    _colorController = TextEditingController(text: edit?.color ?? '');
     _weightController = TextEditingController(
       text: edit?.weightKg != null ? edit!.weightKg.toString() : '',
     );
@@ -81,6 +94,15 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       _selectedMotherId = edit.damId;
       _avatarColorIndex = edit.avatarColorIndex;
     }
+
+    _selectedColor =
+        edit != null && _coatColors.any((c) => c.$1 == edit.color)
+            ? edit.color
+            : _coatColors.first.$1;
+
+    _tagController = TextEditingController(
+      text: edit?.tagNumber ?? _generateTagNumber(_selectedBreed),
+    );
   }
 
   @override
@@ -88,10 +110,37 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     _nameController.dispose();
     _tagController.dispose();
     _cageController.dispose();
-    _colorController.dispose();
     _weightController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  String _breedInitials(String breed) {
+    const stopWords = {'de', 'du', 'des', 'le', 'la', 'les', 'et'};
+    final words =
+        breed
+            .split(RegExp(r'[\s/\-]+'))
+            .where((w) => w.isNotEmpty && !stopWords.contains(w.toLowerCase()))
+            .toList();
+    if (words.isEmpty) return 'LP';
+    if (words.length == 1) {
+      final w = words.first.toUpperCase();
+      return w.length >= 2 ? w.substring(0, 2) : '${w}X';
+    }
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  String _generateTagNumber(String breed) {
+    final rabbits = Provider.of<RabbitProvider>(context, listen: false).rabbits;
+    final base = '${_breedInitials(breed)}-${DateTime.now().year}-';
+    var maxSeq = 0;
+    for (final r in rabbits) {
+      if (r.tagNumber.startsWith(base)) {
+        final seq = int.tryParse(r.tagNumber.substring(base.length)) ?? 0;
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    }
+    return '$base${(maxSeq + 1).toString().padLeft(2, '0')}';
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
@@ -357,10 +406,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       gender: _selectedGender,
       breed: _selectedBreed,
       birthDate: _birthDate,
-      color:
-          _colorController.text.trim().isEmpty
-              ? 'Standard'
-              : _colorController.text.trim(),
+      color: _selectedColor,
       cageNumber: _resolveCageNumber(provider),
       cageId: _selectedCageId,
       compartmentNumber: _selectedCageId == null ? null : _selectedCompartment,
@@ -646,17 +692,13 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                       flex: 5,
                       child: TextFormField(
                         controller: _tagController,
+                        readOnly: true,
                         decoration: const InputDecoration(
-                          labelText: 'Matricule / Bague *',
-                          hintText: 'FB-2024-01',
+                          labelText: 'Matricule / Bague',
                           prefixIcon: Icon(Icons.tag, size: 20),
+                          helperText: 'Généré automatiquement',
+                          helperMaxLines: 1,
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'N° requis';
-                          }
-                          return null;
-                        },
                       ),
                     ),
                   ],
@@ -664,47 +706,44 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
 
                 const SizedBox(height: 16),
 
-                // Breed & Color
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 6,
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        value: _selectedBreed,
-                        decoration: const InputDecoration(
-                          labelText: 'Race *',
-                          prefixIcon: Icon(Icons.pets, size: 20),
-                        ),
-                        items:
-                            _commonBreeds.map((b) {
-                              return DropdownMenuItem(
-                                value: b,
-                                child: Text(
-                                  b,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              );
-                            }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => _selectedBreed = val);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 5,
-                      child: TextFormField(
-                        controller: _colorController,
-                        decoration: const InputDecoration(
-                          labelText: 'Robe / Couleur',
-                          hintText: 'Fauve, Blanc...',
-                          prefixIcon: Icon(Icons.palette_outlined, size: 20),
-                        ),
-                      ),
-                    ),
-                  ],
+                // Breed
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: _selectedBreed,
+                  decoration: const InputDecoration(
+                    labelText: 'Race *',
+                    prefixIcon: Icon(Icons.pets, size: 20),
+                  ),
+                  items:
+                      _commonBreeds.map((b) {
+                        return DropdownMenuItem(
+                          value: b,
+                          child: Text(b, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setState(() {
+                      _selectedBreed = val;
+                      if (widget.initialRabbitToEdit == null) {
+                        _tagController.text = _generateTagNumber(val);
+                      }
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Color
+                _buildSectionTitle('Robe / Couleur'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      _coatColors
+                          .map((c) => _buildColorOption(c.$1, c.$2))
+                          .toList(),
                 ),
 
                 const SizedBox(height: 16),
@@ -986,6 +1025,48 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
         fontSize: 15,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
+      ),
+    );
+  }
+
+  Widget _buildColorOption(String label, Color swatch) {
+    final isSelected = _selectedColor == label;
+    return InkWell(
+      onTap: () => setState(() => _selectedColor = label),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withAlpha(25) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.cardBorder,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: swatch,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.cardBorder, width: 1),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

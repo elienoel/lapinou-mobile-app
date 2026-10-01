@@ -1,15 +1,20 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+import 'api_constants.dart';
 
 /// Détecte le retour de connexion pour déclencher la synchronisation automatique.
 ///
 /// `connectivity_plus` indique seulement qu'une interface réseau est active (wifi,
-/// données mobiles) : ça ne garantit pas un accès réel à internet (wifi sans
-/// internet, portail captif...), donc on vérifie en plus une résolution DNS légère
-/// avant de considérer l'appareil comme réellement en ligne.
+/// données mobiles) : ça ne garantit pas que le serveur Lapinou est joignable
+/// (wifi sans internet, portail captif, DNS/TLS cassé sur ce domaine précis...),
+/// donc on vérifie en plus une requête HTTP réelle vers l'API avant de considérer
+/// l'appareil comme réellement en ligne. Toute réponse HTTP (même une erreur
+/// 4xx/5xx) prouve que le serveur est joignable ; seule une erreur de connexion
+/// (DNS, TLS, timeout, connexion refusée) est considérée comme "hors-ligne".
 class ConnectivityService {
   ConnectivityService._();
   static final ConnectivityService instance = ConnectivityService._();
@@ -43,12 +48,12 @@ class ConnectivityService {
       return false;
     }
     try {
-      final lookup = await InternetAddress.lookup(
-        'example.com',
-      ).timeout(const Duration(seconds: 3));
-      return lookup.isNotEmpty && lookup.first.rawAddress.isNotEmpty;
+      await http
+          .head(Uri.parse(ApiConstants.baseUrl))
+          .timeout(const Duration(seconds: 5));
+      return true;
     } catch (e) {
-      debugPrint('Connectivity check failed: $e');
+      debugPrint('Connectivity check to ${ApiConstants.baseUrl} failed: $e');
       return false;
     }
   }

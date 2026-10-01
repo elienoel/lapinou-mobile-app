@@ -9,9 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lapinou/models/currency.dart';
 import 'package:lapinou/providers/auth_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
+import 'package:lapinou/screens/currency_settings_screen.dart';
 import 'package:lapinou/screens/finances_screen.dart';
 import 'package:lapinou/screens/profile_screen.dart';
 import 'package:lapinou/screens/settings_screen.dart';
+import 'package:lapinou/services/sync_service.dart';
 
 // L'espace fine insécable que intl utilise comme séparateur de milliers en français
 const _nnbsp = ' ';
@@ -35,6 +37,7 @@ Widget _app(AuthProvider auth, Widget home, {RabbitProvider? rabbits}) => MultiP
       providers: [
         ChangeNotifierProvider<AuthProvider>.value(value: auth),
         ChangeNotifierProvider<RabbitProvider>.value(value: rabbits ?? RabbitProvider()),
+        ChangeNotifierProvider<SyncService>.value(value: SyncService.instance),
       ],
       child: MaterialApp(home: home),
     );
@@ -92,15 +95,14 @@ void main() {
     });
   });
 
-  group('SettingsScreen', () {
+  group('CurrencySettingsScreen', () {
     testWidgets('lists the currencies and marks the current one', (tester) async {
       tester.view.physicalSize = const Size(420, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
       final auth = await _auth(tester);
-      await tester.pumpWidget(_app(auth, const SettingsScreen()));
+      await tester.pumpWidget(_app(auth, const CurrencySettingsScreen()));
 
-      expect(find.text('Paramètres'), findsOneWidget);
       expect(find.text('Devise'), findsOneWidget);
       expect(find.text('Euro'), findsOneWidget);
       expect(find.text('Franc CFA (BCEAO)'), findsOneWidget);
@@ -124,7 +126,7 @@ void main() {
       });
 
       await http.runWithClient(() async {
-        await tester.pumpWidget(_app(auth, const SettingsScreen()));
+        await tester.pumpWidget(_app(auth, const CurrencySettingsScreen()));
         await tester.tap(find.byKey(const ValueKey('currency-XOF')));
         await tester.pumpAndSettle();
       }, () => client);
@@ -154,7 +156,7 @@ void main() {
           }, 400));
 
       await http.runWithClient(() async {
-        await tester.pumpWidget(_app(auth, const SettingsScreen()));
+        await tester.pumpWidget(_app(auth, const CurrencySettingsScreen()));
         await tester.tap(find.byKey(const ValueKey('currency-GBP')));
         await tester.pumpAndSettle();
       }, () => client);
@@ -171,7 +173,7 @@ void main() {
       final client = MockClient((_) async => throw http.ClientException('offline'));
 
       await http.runWithClient(() async {
-        await tester.pumpWidget(_app(auth, const SettingsScreen()));
+        await tester.pumpWidget(_app(auth, const CurrencySettingsScreen()));
         await tester.tap(find.byKey(const ValueKey('currency-XOF')));
         await tester.pumpAndSettle();
       }, () => client);

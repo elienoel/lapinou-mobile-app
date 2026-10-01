@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lapinou/models/finance_period.dart';
 import 'package:lapinou/models/finance_transaction.dart';
 import 'package:lapinou/providers/auth_provider.dart';
+import 'package:lapinou/providers/category_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
 import 'package:lapinou/screens/finances_screen.dart';
 
@@ -43,6 +44,7 @@ Future<RabbitProvider> _pump(
       providers: [
         ChangeNotifierProvider<RabbitProvider>.value(value: provider),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => CategoryProvider()),
       ],
       child: const MaterialApp(home: FinancesScreen()),
     ),

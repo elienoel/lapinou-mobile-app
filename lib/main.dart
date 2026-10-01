@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/rabbit_provider.dart';
 import 'providers/community_provider.dart';
+import 'providers/category_provider.dart';
 import 'providers/chat_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/phone_login_screen.dart';
@@ -33,6 +34,7 @@ class LapinouApp extends StatelessWidget {
         ),
         ChangeNotifierProvider.value(value: SyncService.instance),
         ChangeNotifierProvider(create: (_) => CommunityProvider()),
+        ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create: (_) => ChatProvider(),
           update: (_, auth, chat) => (chat ?? ChatProvider())..setToken(auth.token),

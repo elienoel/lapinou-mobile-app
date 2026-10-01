@@ -86,8 +86,10 @@ class RabbitProvider extends ChangeNotifier {
   int get totalRabbitsCount => _rabbits.length;
   int get activePregnanciesCount =>
       _rabbits.where((r) => r.status == RabbitStatus.pregnant).length;
+
   /// Lapereaux encore au nid (nés vivants, ni sevrés ni morts), toutes portées confondues.
-  int get totalKitsInNests => _litters.fold(0, (sum, l) => sum + l.kitsRemaining);
+  int get totalKitsInNests =>
+      _litters.fold(0, (sum, l) => sum + l.kitsRemaining);
 
   /// Portées dont la date de sevrage prévue est passée et qui attendent d'être sevrées.
   int get littersToWeanCount =>
@@ -101,7 +103,9 @@ class RabbitProvider extends ChangeNotifier {
   /// Portées d'un lapin (comme mère ou comme père), la plus récente d'abord.
   List<Litter> littersOf(String rabbitId) {
     final list =
-        _litters.where((l) => l.motherId == rabbitId || l.fatherId == rabbitId).toList()
+        _litters
+            .where((l) => l.motherId == rabbitId || l.fatherId == rabbitId)
+            .toList()
           ..sort((a, b) => b.birthDate.compareTo(a.birthDate));
     return list;
   }
@@ -112,11 +116,15 @@ class RabbitProvider extends ChangeNotifier {
 
   /// Soins effectués sur un lapin, le plus récent d'abord.
   List<CareRecord> careRecordsOf(String rabbitId) =>
-      _careRecords.where((c) => c.rabbits.any((r) => r.id == rabbitId)).toList();
+      _careRecords
+          .where((c) => c.rabbits.any((r) => r.id == rabbitId))
+          .toList();
 
   /// Prochains soins d'un lapin, du plus urgent au plus lointain.
   List<UpcomingCare> upcomingCaresOf(String rabbitId) =>
-      _upcomingCares.where((c) => c.rabbits.any((r) => r.id == rabbitId)).toList();
+      _upcomingCares
+          .where((c) => c.rabbits.any((r) => r.id == rabbitId))
+          .toList();
 
   Rabbit? getRabbitById(String? id) {
     if (id == null) return null;
@@ -170,11 +178,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(
+        await LocalDatabase.instance.replaceFromServer(SyncEntity.rabbit, [
+          for (final item in list) Map<String, dynamic>.from(item),
+        ]);
+        final refreshed = await LocalDatabase.instance.getAll(
           SyncEntity.rabbit,
-          [for (final item in list) Map<String, dynamic>.from(item)],
         );
-        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.rabbit);
         _rabbits = refreshed.map((r) => Rabbit.fromJson(r.data)).toList();
         notifyListeners();
       }
@@ -192,7 +201,11 @@ class RabbitProvider extends ChangeNotifier {
     _rabbits.insert(0, rabbit);
     notifyListeners();
 
-    await SyncService.instance.recordCreate(SyncEntity.rabbit, rabbit.id, rabbit.toJson());
+    await SyncService.instance.recordCreate(
+      SyncEntity.rabbit,
+      rabbit.id,
+      rabbit.toJson(),
+    );
 
     // Si la synchronisation a eu lieu immédiatement (en ligne), l'id temporaire a été
     // remplacé par l'id serveur : on aligne la liste en mémoire et on peut envoyer la photo.
@@ -210,7 +223,12 @@ class RabbitProvider extends ChangeNotifier {
       if (photoFile != null) {
         final t = token ?? _token;
         if (t != null && t.isNotEmpty) {
-          await uploadRabbitPhoto(created.id, photoFile, isPrimary: true, token: t);
+          await uploadRabbitPhoto(
+            created.id,
+            photoFile,
+            isPrimary: true,
+            token: t,
+          );
         }
       }
     }
@@ -340,7 +358,11 @@ class RabbitProvider extends ChangeNotifier {
       _rabbits[index] = rabbit;
       notifyListeners();
     }
-    await SyncService.instance.recordUpdate(SyncEntity.rabbit, rabbit.id, rabbit.toJson());
+    await SyncService.instance.recordUpdate(
+      SyncEntity.rabbit,
+      rabbit.id,
+      rabbit.toJson(),
+    );
     return true;
   }
 
@@ -377,10 +399,9 @@ class RabbitProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final body = jsonDecode(utf8.decode(response.bodyBytes));
         final List list = body['data'] is List ? body['data'] : [];
-        await LocalDatabase.instance.replaceFromServer(
-          SyncEntity.cage,
-          [for (final item in list) Map<String, dynamic>.from(item)],
-        );
+        await LocalDatabase.instance.replaceFromServer(SyncEntity.cage, [
+          for (final item in list) Map<String, dynamic>.from(item),
+        ]);
         final refreshed = await LocalDatabase.instance.getAll(SyncEntity.cage);
         _cages = refreshed.map((c) => Cage.fromJson(c.data)).toList();
         notifyListeners();
@@ -401,9 +422,17 @@ class RabbitProvider extends ChangeNotifier {
   }) async {
     if (isNew) {
       final localId = 'cage-${DateTime.now().millisecondsSinceEpoch}';
-      await SyncService.instance.recordCreate(SyncEntity.cage, localId, cage.toJson());
+      await SyncService.instance.recordCreate(
+        SyncEntity.cage,
+        localId,
+        cage.toJson(),
+      );
     } else {
-      await SyncService.instance.recordUpdate(SyncEntity.cage, cage.id, cage.toJson());
+      await SyncService.instance.recordUpdate(
+        SyncEntity.cage,
+        cage.id,
+        cage.toJson(),
+      );
     }
     await fetchCages(token: token);
     return null;
@@ -428,7 +457,9 @@ class RabbitProvider extends ChangeNotifier {
     if (cageId != null) {
       final cage = getCageById(cageId);
       if (cage == null) return 'Cette cage est introuvable.';
-      if (compartmentNumber == null || compartmentNumber < 1 || compartmentNumber > cage.compartmentsCount) {
+      if (compartmentNumber == null ||
+          compartmentNumber < 1 ||
+          compartmentNumber > cage.compartmentsCount) {
         return 'La cage ${cage.name} possède ${cage.compartmentsCount} loge(s).';
       }
     }
@@ -439,7 +470,8 @@ class RabbitProvider extends ChangeNotifier {
     final updated = rabbit.copyWith(
       cageId: cageId,
       compartmentNumber: cageId == null ? null : compartmentNumber,
-      cageNumber: cageId == null ? 'Non assigné' : '$cageName-$compartmentNumber',
+      cageNumber:
+          cageId == null ? 'Non assigné' : '$cageName-$compartmentNumber',
       clearCage: cageId == null,
     );
     final idx = _rabbits.indexWhere((r) => r.id == rabbitId);
@@ -447,7 +479,11 @@ class RabbitProvider extends ChangeNotifier {
       _rabbits[idx] = updated;
       notifyListeners();
     }
-    await SyncService.instance.recordUpdate(SyncEntity.rabbit, rabbitId, updated.toJson());
+    await SyncService.instance.recordUpdate(
+      SyncEntity.rabbit,
+      rabbitId,
+      updated.toJson(),
+    );
     return null;
   }
 
@@ -486,11 +522,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(
+        await LocalDatabase.instance.replaceFromServer(SyncEntity.mating, [
+          for (final item in list) Map<String, dynamic>.from(item),
+        ]);
+        final refreshed = await LocalDatabase.instance.getAll(
           SyncEntity.mating,
-          [for (final item in list) Map<String, dynamic>.from(item)],
         );
-        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.mating);
         _matings = refreshed.map((m) => Mating.fromJson(m.data)).toList();
         notifyListeners();
       }
@@ -503,7 +540,11 @@ class RabbitProvider extends ChangeNotifier {
     _matings.insert(0, mating);
     _setLocalRabbitStatus(mating.femaleId, RabbitStatus.pregnant);
     notifyListeners();
-    await SyncService.instance.recordCreate(SyncEntity.mating, mating.id, mating.toJson());
+    await SyncService.instance.recordCreate(
+      SyncEntity.mating,
+      mating.id,
+      mating.toJson(),
+    );
     return true;
   }
 
@@ -516,7 +557,11 @@ class RabbitProvider extends ChangeNotifier {
       _matings[index] = mating;
       notifyListeners();
     }
-    await SyncService.instance.recordUpdate(SyncEntity.mating, mating.id, mating.toJson());
+    await SyncService.instance.recordUpdate(
+      SyncEntity.mating,
+      mating.id,
+      mating.toJson(),
+    );
     if (await ConnectivityService.instance.isOnline()) {
       await fetchRabbits(token: token);
     }
@@ -525,28 +570,30 @@ class RabbitProvider extends ChangeNotifier {
 
   /// Confirme que la palpation a été effectuée (gestation confirmée) à la date [doneAt].
   /// Renvoie null en cas de succès, sinon le message d'erreur.
-  Future<String?> confirmPalpation(Mating mating, {DateTime? doneAt, String? token}) {
+  Future<String?> confirmPalpation(
+    Mating mating, {
+    DateTime? doneAt,
+    String? token,
+  }) {
     final d = doneAt ?? DateTime.now();
-    return _matingAction(
-      ApiConstants.matingPalpationUrl(mating.id),
-      {
-        'done_at':
-            '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
-      },
-      token: token,
-    );
+    return _matingAction(ApiConstants.matingPalpationUrl(mating.id), {
+      'done_at':
+          '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+    }, token: token);
   }
 
   /// Annule la saillie (échec constaté, par exemple à la palpation) ; [reason] est ajouté aux notes.
   Future<String?> cancelMating(Mating mating, {String? reason, String? token}) {
-    return _matingAction(
-      ApiConstants.matingCancelUrl(mating.id),
-      {if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()},
-      token: token,
-    );
+    return _matingAction(ApiConstants.matingCancelUrl(mating.id), {
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    }, token: token);
   }
 
-  Future<String?> _matingAction(String url, Map<String, dynamic> body, {String? token}) async {
+  Future<String?> _matingAction(
+    String url,
+    Map<String, dynamic> body, {
+    String? token,
+  }) async {
     final t = token ?? _token;
     if (t == null || t.isEmpty) return 'Session expirée';
     try {
@@ -557,7 +604,9 @@ class RabbitProvider extends ChangeNotifier {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        final updated = Mating.fromJson(Map<String, dynamic>.from(data['data']));
+        final updated = Mating.fromJson(
+          Map<String, dynamic>.from(data['data']),
+        );
         final idx = _matings.indexWhere((m) => m.id == updated.id);
         if (idx != -1) _matings[idx] = updated;
         notifyListeners();
@@ -629,11 +678,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(
+        await LocalDatabase.instance.replaceFromServer(SyncEntity.litter, [
+          for (final item in list) Map<String, dynamic>.from(item),
+        ]);
+        final refreshed = await LocalDatabase.instance.getAll(
           SyncEntity.litter,
-          [for (final item in list) Map<String, dynamic>.from(item)],
         );
-        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.litter);
         _litters = refreshed.map((l) => Litter.fromJson(l.data)).toList();
         notifyListeners();
       }
@@ -653,7 +703,11 @@ class RabbitProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    await SyncService.instance.recordCreate(SyncEntity.litter, litter.id, litter.toJson());
+    await SyncService.instance.recordCreate(
+      SyncEntity.litter,
+      litter.id,
+      litter.toJson(),
+    );
     // Une fois synchronisé, le backend a mis à jour l'accouplement (mise bas
     // réalisée) et la mère ; on rafraîchit pour refléter ces recalculs.
     if (await ConnectivityService.instance.isOnline()) {
@@ -679,7 +733,9 @@ class RabbitProvider extends ChangeNotifier {
       );
       if (response.statusCode == 200) {
         final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final updated = Litter.fromJson(Map<String, dynamic>.from(body['data']));
+        final updated = Litter.fromJson(
+          Map<String, dynamic>.from(body['data']),
+        );
         final idx = _litters.indexWhere((l) => l.id == litter.id);
         if (idx != -1) _litters[idx] = updated;
         notifyListeners();
@@ -740,8 +796,14 @@ class RabbitProvider extends ChangeNotifier {
       if (errors is Map && errors['rabbits'] is Map) {
         final perKit = errors['rabbits'] as Map;
         final first = perKit.entries.first;
-        final fieldErrors = first.value is Map ? (first.value as Map).values.first : first.value;
-        final text = fieldErrors is List && fieldErrors.isNotEmpty ? fieldErrors.first : fieldErrors;
+        final fieldErrors =
+            first.value is Map
+                ? (first.value as Map).values.first
+                : first.value;
+        final text =
+            fieldErrors is List && fieldErrors.isNotEmpty
+                ? fieldErrors.first
+                : fieldErrors;
         final index = int.tryParse('${first.key}');
         return index == null ? '$text' : 'Lapereau ${index + 1} : $text';
       }
@@ -770,11 +832,12 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(
+        await LocalDatabase.instance.replaceFromServer(SyncEntity.careEvent, [
+          for (final item in list) Map<String, dynamic>.from(item),
+        ]);
+        final refreshed = await LocalDatabase.instance.getAll(
           SyncEntity.careEvent,
-          [for (final item in list) Map<String, dynamic>.from(item)],
         );
-        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.careEvent);
         _careEvents = refreshed.map((c) => CareEvent.fromJson(c.data)).toList();
         notifyListeners();
       }
@@ -786,7 +849,11 @@ class RabbitProvider extends ChangeNotifier {
   Future<bool> addCareEvent(CareEvent event, {String? token}) async {
     _careEvents.insert(0, event);
     notifyListeners();
-    await SyncService.instance.recordCreate(SyncEntity.careEvent, event.id, event.toJson());
+    await SyncService.instance.recordCreate(
+      SyncEntity.careEvent,
+      event.id,
+      event.toJson(),
+    );
     return true;
   }
 
@@ -794,10 +861,16 @@ class RabbitProvider extends ChangeNotifier {
   /// Types de soins et historique sont disponibles hors-ligne ; les rappels à venir
   /// (calculés par le serveur) nécessitent une connexion.
   Future<void> fetchCare({String? token}) async {
-    final localTreatments = await LocalDatabase.instance.getAll(SyncEntity.careTreatment);
-    _careTreatments = localTreatments.map((c) => CareTreatment.fromJson(c.data)).toList();
-    final localRecords = await LocalDatabase.instance.getAll(SyncEntity.careRecord);
-    _careRecords = localRecords.map((c) => CareRecord.fromJson(c.data)).toList();
+    final localTreatments = await LocalDatabase.instance.getAll(
+      SyncEntity.careTreatment,
+    );
+    _careTreatments =
+        localTreatments.map((c) => CareTreatment.fromJson(c.data)).toList();
+    final localRecords = await LocalDatabase.instance.getAll(
+      SyncEntity.careRecord,
+    );
+    _careRecords =
+        localRecords.map((c) => CareRecord.fromJson(c.data)).toList();
     notifyListeners();
 
     final t = token ?? _token;
@@ -822,19 +895,22 @@ class RabbitProvider extends ChangeNotifier {
       load(ApiConstants.careUpcomingUrl),
     ]);
     if (results[0] != null) {
-      await LocalDatabase.instance.replaceFromServer(
+      await LocalDatabase.instance.replaceFromServer(SyncEntity.careTreatment, [
+        for (final j in results[0]!) Map<String, dynamic>.from(j),
+      ]);
+      final refreshed = await LocalDatabase.instance.getAll(
         SyncEntity.careTreatment,
-        [for (final j in results[0]!) Map<String, dynamic>.from(j)],
       );
-      final refreshed = await LocalDatabase.instance.getAll(SyncEntity.careTreatment);
-      _careTreatments = refreshed.map((c) => CareTreatment.fromJson(c.data)).toList();
+      _careTreatments =
+          refreshed.map((c) => CareTreatment.fromJson(c.data)).toList();
     }
     if (results[1] != null) {
-      await LocalDatabase.instance.replaceFromServer(
+      await LocalDatabase.instance.replaceFromServer(SyncEntity.careRecord, [
+        for (final j in results[1]!) Map<String, dynamic>.from(j),
+      ]);
+      final refreshed = await LocalDatabase.instance.getAll(
         SyncEntity.careRecord,
-        [for (final j in results[1]!) Map<String, dynamic>.from(j)],
       );
-      final refreshed = await LocalDatabase.instance.getAll(SyncEntity.careRecord);
       _careRecords = refreshed.map((c) => CareRecord.fromJson(c.data)).toList();
     }
     if (results[2] != null) {
@@ -865,9 +941,17 @@ class RabbitProvider extends ChangeNotifier {
     };
     if (id == null) {
       final localId = 'trt-${DateTime.now().millisecondsSinceEpoch}';
-      await SyncService.instance.recordCreate(SyncEntity.careTreatment, localId, payload);
+      await SyncService.instance.recordCreate(
+        SyncEntity.careTreatment,
+        localId,
+        payload,
+      );
     } else {
-      await SyncService.instance.recordUpdate(SyncEntity.careTreatment, id, payload);
+      await SyncService.instance.recordUpdate(
+        SyncEntity.careTreatment,
+        id,
+        payload,
+      );
     }
     await fetchCare(token: token);
     return null;
@@ -914,9 +998,17 @@ class RabbitProvider extends ChangeNotifier {
     };
     if (id == null) {
       final localId = 'crd-${DateTime.now().millisecondsSinceEpoch}';
-      await SyncService.instance.recordCreate(SyncEntity.careRecord, localId, payload);
+      await SyncService.instance.recordCreate(
+        SyncEntity.careRecord,
+        localId,
+        payload,
+      );
     } else {
-      await SyncService.instance.recordUpdate(SyncEntity.careRecord, id, payload);
+      await SyncService.instance.recordUpdate(
+        SyncEntity.careRecord,
+        id,
+        payload,
+      );
     }
     await fetchCare(token: token);
     return null;
@@ -950,12 +1042,14 @@ class RabbitProvider extends ChangeNotifier {
             body['data'] is List
                 ? body['data']
                 : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(
+        await LocalDatabase.instance.replaceFromServer(SyncEntity.finance, [
+          for (final item in list) Map<String, dynamic>.from(item),
+        ]);
+        final refreshed = await LocalDatabase.instance.getAll(
           SyncEntity.finance,
-          [for (final item in list) Map<String, dynamic>.from(item)],
         );
-        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.finance);
-        _finances = refreshed.map((f) => FinanceTransaction.fromJson(f.data)).toList();
+        _finances =
+            refreshed.map((f) => FinanceTransaction.fromJson(f.data)).toList();
         notifyListeners();
       }
     } catch (e) {
@@ -969,7 +1063,35 @@ class RabbitProvider extends ChangeNotifier {
   }) async {
     _finances.insert(0, transaction);
     notifyListeners();
-    await SyncService.instance.recordCreate(SyncEntity.finance, transaction.id, transaction.toJson());
+    await SyncService.instance.recordCreate(
+      SyncEntity.finance,
+      transaction.id,
+      transaction.toJson(),
+    );
+    return true;
+  }
+
+  Future<bool> updateFinanceTransaction(
+    FinanceTransaction transaction, {
+    String? token,
+  }) async {
+    final index = _finances.indexWhere((f) => f.id == transaction.id);
+    if (index != -1) {
+      _finances[index] = transaction;
+      notifyListeners();
+    }
+    await SyncService.instance.recordUpdate(
+      SyncEntity.finance,
+      transaction.id,
+      transaction.toJson(),
+    );
+    return true;
+  }
+
+  Future<bool> deleteFinanceTransaction(String id, {String? token}) async {
+    _finances.removeWhere((f) => f.id == id);
+    notifyListeners();
+    await SyncService.instance.recordDelete(SyncEntity.finance, id);
     return true;
   }
 
@@ -1294,9 +1416,9 @@ class WeanedKit {
   });
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'tag_number': tagNumber,
-        'gender': gender == RabbitGender.male ? 'M' : 'F',
-        if (color != null && color!.isNotEmpty) 'color': color,
-      };
+    'name': name,
+    'tag_number': tagNumber,
+    'gender': gender == RabbitGender.male ? 'M' : 'F',
+    if (color != null && color!.isNotEmpty) 'color': color,
+  };
 }

@@ -5,9 +5,12 @@ import '../models/currency.dart';
 import '../models/finance_period.dart';
 import '../models/finance_transaction.dart';
 import '../providers/auth_provider.dart';
+import '../providers/category_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
+
+const String _addCategoryValue = '__add_category__';
 
 class FinancesScreen extends StatefulWidget {
   final int initialFilterIndex; // 0: Tout, 1: Dépenses, 2: Ventes
@@ -98,21 +101,37 @@ class _FinancesScreenState extends State<FinancesScreen> {
     );
   }
 
-  void _showAddTransactionDialog(
+  void _showTransactionForm(
     BuildContext context,
     RabbitProvider provider,
-    bool isIncome,
-  ) {
-    final titleController = TextEditingController();
-    final amountController = TextEditingController();
-    final categoryController = TextEditingController(
-      text: isIncome ? 'Vente reproducteur' : 'Alimentation',
+    bool isIncome, {
+    FinanceTransaction? existing,
+  }) {
+    final isEditing = existing != null;
+    final titleController = TextEditingController(text: existing?.title ?? '');
+    final amountController = TextEditingController(
+      text: existing != null ? existing.amount.toString() : '',
     );
-    final notesController = TextEditingController();
+    final notesController = TextEditingController(text: existing?.notes ?? '');
     final currency = context.read<AuthProvider>().currency;
+    final categoryType =
+        isIncome ? TransactionType.income : TransactionType.expense;
+    final categories = context.read<CategoryProvider>();
+    var categoryOptions = categories.categoriesFor(categoryType);
+    var selectedCategory =
+        existing != null && categoryOptions.contains(existing.category)
+            ? existing.category
+            : (categoryOptions.isNotEmpty ? categoryOptions.first : null);
     // La date vaut aujourd'hui par défaut ; on peut la reculer pour une saisie a posteriori
     final now = DateTime.now();
-    var txDate = DateTime(now.year, now.month, now.day);
+    var txDate =
+        existing != null
+            ? DateTime(
+              existing.date.year,
+              existing.date.month,
+              existing.date.day,
+            )
+            : DateTime(now.year, now.month, now.day);
 
     showModalBottomSheet(
       context: context,
@@ -137,9 +156,13 @@ class _FinancesScreenState extends State<FinancesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isIncome
-                            ? 'Enregistrer une Vente 💰'
-                            : 'Enregistrer une Dépense 📦',
+                        isEditing
+                            ? (isIncome
+                                ? 'Modifier la Vente 💰'
+                                : 'Modifier la Dépense 📦')
+                            : (isIncome
+                                ? 'Enregistrer une Vente 💰'
+                                : 'Enregistrer une Dépense 📦'),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -194,15 +217,82 @@ class _FinancesScreenState extends State<FinancesScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: categoryController,
-                        decoration: InputDecoration(
+                      DropdownButtonFormField<String>(
+                        key: const ValueKey('tx-category'),
+                        isExpanded: true,
+                        value: selectedCategory,
+                        decoration: const InputDecoration(
                           labelText: 'Catégorie',
-                          hintText:
-                              isIncome
-                                  ? 'Reproducteur, Viande, Engrais...'
-                                  : 'Alimentation, Vétérinaire, Matériel...',
+                          prefixIcon: Icon(Icons.sell_outlined, size: 20),
                         ),
+                        items: [
+                          for (final c in categoryOptions)
+                            DropdownMenuItem(value: c, child: Text(c)),
+                          const DropdownMenuItem(
+                            value: _addCategoryValue,
+                            child: Text(
+                              '+ Ajouter une catégorie…',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) async {
+                          if (val == _addCategoryValue) {
+                            final controller = TextEditingController();
+                            final confirmed = await showDialog<bool>(
+                              context: ctx,
+                              builder:
+                                  (dialogCtx) => AlertDialog(
+                                    title: Text(
+                                      isIncome
+                                          ? 'Nouvelle catégorie de revenu'
+                                          : 'Nouvelle catégorie de dépense',
+                                    ),
+                                    content: TextField(
+                                      controller: controller,
+                                      autofocus: true,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Ex: Location de matériel',
+                                      ),
+                                      onSubmitted:
+                                          (_) => Navigator.pop(dialogCtx, true),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed:
+                                            () =>
+                                                Navigator.pop(dialogCtx, false),
+                                        child: const Text('Annuler'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed:
+                                            () =>
+                                                Navigator.pop(dialogCtx, true),
+                                        child: const Text('Ajouter'),
+                                      ),
+                                    ],
+                                  ),
+                            );
+                            if (confirmed == true &&
+                                controller.text.trim().isNotEmpty) {
+                              final added = await categories.addCategory(
+                                categoryType,
+                                controller.text.trim(),
+                              );
+                              setSheetState(() {
+                                categoryOptions = categories.categoriesFor(
+                                  categoryType,
+                                );
+                                selectedCategory = added;
+                              });
+                            }
+                            return;
+                          }
+                          setSheetState(() => selectedCategory = val);
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -228,6 +318,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                             if (title.isNotEmpty && amount > 0) {
                               final tx = FinanceTransaction(
                                 id:
+                                    existing?.id ??
                                     'fin-${DateTime.now().millisecondsSinceEpoch}',
                                 type:
                                     isIncome
@@ -237,22 +328,27 @@ class _FinancesScreenState extends State<FinancesScreen> {
                                 amount: amount,
                                 date: txDate,
                                 category:
-                                    categoryController.text.trim().isEmpty
-                                        ? (isIncome ? 'Vente' : 'Dépense')
-                                        : categoryController.text.trim(),
+                                    selectedCategory ??
+                                    (isIncome ? 'Vente' : 'Dépense'),
                                 notes:
                                     notesController.text.trim().isEmpty
                                         ? null
                                         : notesController.text.trim(),
                               );
-                              provider.addFinanceTransaction(tx);
+                              if (isEditing) {
+                                provider.updateFinanceTransaction(tx);
+                              } else {
+                                provider.addFinanceTransaction(tx);
+                              }
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    isIncome
-                                        ? 'Vente de ${currency.format(amount)} enregistrée !'
-                                        : 'Dépense de ${currency.format(amount)} enregistrée.',
+                                    isEditing
+                                        ? 'Modifications enregistrées.'
+                                        : (isIncome
+                                            ? 'Vente de ${currency.format(amount)} enregistrée !'
+                                            : 'Dépense de ${currency.format(amount)} enregistrée.'),
                                   ),
                                   backgroundColor:
                                       isIncome
@@ -269,9 +365,11 @@ class _FinancesScreenState extends State<FinancesScreen> {
                                     : Colors.orange.shade800,
                           ),
                           child: Text(
-                            isIncome
-                                ? 'Valider la Vente (+)'
-                                : 'Valider la Dépense (-)',
+                            isEditing
+                                ? 'Enregistrer les modifications'
+                                : (isIncome
+                                    ? 'Valider la Vente (+)'
+                                    : 'Valider la Dépense (-)'),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -486,7 +584,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                         Expanded(
                           child: InkWell(
                             onTap:
-                                () => _showAddTransactionDialog(
+                                () => _showTransactionForm(
                                   context,
                                   provider,
                                   false,
@@ -504,7 +602,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                         Expanded(
                           child: InkWell(
                             onTap:
-                                () => _showAddTransactionDialog(
+                                () => _showTransactionForm(
                                   context,
                                   provider,
                                   true,
@@ -566,7 +664,12 @@ class _FinancesScreenState extends State<FinancesScreen> {
                       )
                     else
                       ...filteredList.map(
-                        (fin) => _buildTransactionCard(fin, currency),
+                        (fin) => _buildTransactionCard(
+                          context,
+                          provider,
+                          fin,
+                          currency,
+                        ),
                       ),
 
                     const SizedBox(height: 40),
@@ -666,74 +769,94 @@ class _FinancesScreenState extends State<FinancesScreen> {
     );
   }
 
-  Widget _buildTransactionCard(FinanceTransaction fin, AppCurrency currency) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color:
-                  fin.isIncome
-                      ? AppColors.statusActiveBg
-                      : AppColors.statusAlertBg,
-              border: Border.all(
+  Widget _buildTransactionCard(
+    BuildContext context,
+    RabbitProvider provider,
+    FinanceTransaction fin,
+    AppCurrency currency,
+  ) {
+    return InkWell(
+      key: ValueKey('tx-${fin.id}'),
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      onTap:
+          () => _showTransactionForm(
+            context,
+            provider,
+            fin.isIncome,
+            existing: fin,
+          ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color:
+                    fin.isIncome
+                        ? AppColors.statusActiveBg
+                        : AppColors.statusAlertBg,
+                border: Border.all(
+                  color:
+                      fin.isIncome
+                          ? AppColors.statusActiveText
+                          : Colors.redAccent,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                fin.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
+                color:
+                    fin.isIncome
+                        ? AppColors.statusActiveText
+                        : Colors.redAccent,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fin.title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    '${fin.category} • ${DateFormat('dd MMM yyyy', 'fr_FR').format(fin.date)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              currency.format(
+                fin.isIncome ? fin.amount : -fin.amount,
+                showSign: true,
+              ),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
                 color:
                     fin.isIncome
                         ? AppColors.statusActiveText
                         : Colors.redAccent,
               ),
-              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              fin.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-              color:
-                  fin.isIncome ? AppColors.statusActiveText : Colors.redAccent,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fin.title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  '${fin.category} • ${DateFormat('dd MMM yyyy', 'fr_FR').format(fin.date)}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            currency.format(
-              fin.isIncome ? fin.amount : -fin.amount,
-              showSign: true,
-            ),
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color:
-                  fin.isIncome ? AppColors.statusActiveText : Colors.redAccent,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

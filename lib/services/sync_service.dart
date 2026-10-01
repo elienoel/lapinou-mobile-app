@@ -44,10 +44,14 @@ class SyncService extends ChangeNotifier {
   bool _isSyncing = false;
   SyncStatus _status = SyncStatus.idle;
   int _pendingCount = 0;
+  String? _lastError;
+  DateTime? _lastSyncedAt;
   StreamSubscription<bool>? _connectivitySub;
 
   SyncStatus get status => _status;
   int get pendingCount => _pendingCount;
+  String? get lastError => _lastError;
+  DateTime? get lastSyncedAt => _lastSyncedAt;
 
   static final Map<SyncEntity, _EntityConfig> _configs = {
     SyncEntity.rabbit: _EntityConfig(
@@ -189,14 +193,22 @@ class SyncService extends ChangeNotifier {
     if (_isSyncing || _token == null || _token!.isEmpty) return;
     _isSyncing = true;
     _status = SyncStatus.syncing;
+    _lastError = null;
     notifyListeners();
     try {
       await _push();
       await _pull();
-      _status = SyncStatus.idle;
+      _lastSyncedAt = DateTime.now();
+      // _push() s'arrête sans lever d'exception dès qu'un item échoue (réseau ou
+      // serveur) pour ne pas bloquer les suivants indéfiniment : s'il reste des
+      // éléments en file, ce n'est donc pas un vrai succès même sans exception.
+      final stillPending = await _db.pendingCount();
+      _status = stillPending == 0 ? SyncStatus.idle : SyncStatus.error;
+      if (stillPending == 0) _lastError = null;
     } catch (e) {
       debugPrint('Sync error: $e');
       _status = SyncStatus.error;
+      _lastError ??= 'Erreur de synchronisation : $e';
     } finally {
       _isSyncing = false;
       await refreshPendingCount();
@@ -270,6 +282,7 @@ class SyncService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Network error syncing ${item.entity.name} ${item.operation}: $e');
+      _lastError = 'Connexion au serveur impossible ($e).';
       return false;
     }
 
@@ -310,6 +323,7 @@ class SyncService extends ChangeNotifier {
     }
 
     debugPrint('Sync push failed (${response.statusCode}) for ${item.entity.name}: ${response.body}');
+    _lastError = 'Le serveur a renvoyé une erreur (${response.statusCode}).';
     return false;
   }
 
@@ -389,6 +403,7 @@ class SyncService extends ChangeNotifier {
         await prefs.setString(prefsKey, DateTime.now().toUtc().toIso8601String());
       } catch (e) {
         debugPrint('Pull failed for ${entity.name}: $e');
+        _lastError = 'Impossible de récupérer les dernières données du serveur ($e).';
       }
     }
   }
