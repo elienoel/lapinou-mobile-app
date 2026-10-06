@@ -43,11 +43,11 @@ class ConnectivityService {
   }
 
   Future<bool> isOnline() async {
-    final results = await _connectivity.checkConnectivity();
-    if (results.every((r) => r == ConnectivityResult.none)) {
-      return false;
-    }
     try {
+      final results = await _connectivity.checkConnectivity();
+      if (results.every((r) => r == ConnectivityResult.none)) {
+        return false;
+      }
       await http
           .head(Uri.parse(ApiConstants.baseUrl))
           .timeout(const Duration(seconds: 5));

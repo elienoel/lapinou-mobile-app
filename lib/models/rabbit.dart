@@ -275,12 +275,13 @@ class Rabbit {
           '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',
       'color': color,
       'cage_number': cageNumber,
-      'cage': cageId == null ? null : int.tryParse(cageId!),
+      // Repli sur l'id local (non numérique) si la cage/le parent n'a pas encore
+      // été synchronisé·e : ça permet à SyncService de détecter la référence non
+      // résolue et de différer l'envoi, plutôt que de silencieusement l'omettre.
+      'cage': cageId == null ? null : (int.tryParse(cageId!) ?? cageId),
       'compartment_number': cageId == null ? null : compartmentNumber,
-      if (sireId != null && int.tryParse(sireId!) != null)
-        'sire': int.tryParse(sireId!),
-      if (damId != null && int.tryParse(damId!) != null)
-        'dam': int.tryParse(damId!),
+      'sire': sireId == null ? null : (int.tryParse(sireId!) ?? sireId),
+      'dam': damId == null ? null : (int.tryParse(damId!) ?? damId),
       'status': status.name,
       if (weightKg != null) 'weight_kg': weightKg,
       'avatar_color_index': avatarColorIndex,

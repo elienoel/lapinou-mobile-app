@@ -202,7 +202,6 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
         children: [
           Row(
             children: [
-              RabbitAvatar(rabbit: r, size: 68),
               GestureDetector(
                 onTap: () => _showAddPhotoSheet(context, r),
                 child: Stack(
@@ -253,8 +252,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                Colors.white,
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -292,7 +290,9 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.statusActiveBg,
-                            border: Border.all(color: AppColors.statusActiveText),
+                            border: Border.all(
+                              color: AppColors.statusActiveText,
+                            ),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -305,7 +305,10 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                           ),
                         ),
                         // Lapereaux non sevrés avec cette lapine
-                        if (context.watch<RabbitProvider>().nursingKitsOf(r.id) > 0)
+                        if (context.watch<RabbitProvider>().nursingKitsOf(
+                              r.id,
+                            ) >
+                            0)
                           Container(
                             key: const ValueKey('header-nursing-kits'),
                             padding: const EdgeInsets.symmetric(
@@ -314,7 +317,9 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.statusPregnantBg,
-                              border: Border.all(color: AppColors.statusPregnantText),
+                              border: Border.all(
+                                color: AppColors.statusPregnantText,
+                              ),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Builder(
@@ -500,7 +505,8 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => RabbitDetailScreen(rabbit: childRabbit),
+                      builder:
+                          (context) => RabbitDetailScreen(rabbit: childRabbit),
                     ),
                   );
                 },
@@ -531,7 +537,10 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -557,12 +566,26 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
   }
 
   Widget _buildLitterTile(Rabbit r, Litter l, RabbitProvider provider) {
-    final partner = provider.getRabbitById(r.isFemale ? l.fatherId : l.motherId);
+    final partner = provider.getRabbitById(
+      r.isFemale ? l.fatherId : l.motherId,
+    );
     final status = l.status;
     final (bg, fg, badge) = switch (status) {
-      LitterStatus.nursing => (AppColors.statusPregnantBg, AppColors.statusPregnantText, 'Au nid'),
-      LitterStatus.weaningDue => (AppColors.statusAlertBg, AppColors.statusAlertText, 'Sevrage à faire'),
-      LitterStatus.weaned => (AppColors.statusActiveBg, AppColors.statusActiveText, 'Sevrée'),
+      LitterStatus.nursing => (
+        AppColors.statusPregnantBg,
+        AppColors.statusPregnantText,
+        'Au nid',
+      ),
+      LitterStatus.weaningDue => (
+        AppColors.statusAlertBg,
+        AppColors.statusAlertText,
+        'Sevrage à faire',
+      ),
+      LitterStatus.weaned => (
+        AppColors.statusActiveBg,
+        AppColors.statusActiveText,
+        'Sevrée',
+      ),
     };
     final d = l.daysUntilWeaning;
     final weaning = switch (status) {
@@ -571,8 +594,11 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
             ? 'Sevrée le ${DateFormat('dd/MM/yyyy').format(l.weanedAt!)}'
             : 'Sevrage terminé',
       LitterStatus.weaningDue =>
-        d == 0 ? 'Sevrage à faire aujourd\'hui' : 'Sevrage en retard de ${-d} j',
-      LitterStatus.nursing => 'Sevrage dans $d j (${DateFormat('dd/MM').format(l.calculatedWeaningDate)})',
+        d == 0
+            ? 'Sevrage à faire aujourd\'hui'
+            : 'Sevrage en retard de ${-d} j',
+      LitterStatus.nursing =>
+        'Sevrage dans $d j (${DateFormat('dd/MM').format(l.calculatedWeaningDate)})',
     };
 
     return Card(
@@ -588,15 +614,29 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                 Expanded(
                   child: Text(
                     'Née le ${DateFormat('dd/MM/yyyy').format(l.birthDate)} · J${l.ageDays}',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: bg, border: Border.all(color: fg), borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    border: Border.all(color: fg),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
                     badge,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
                   ),
                 ),
               ],
@@ -606,13 +646,20 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
               partner == null
                   ? (r.isFemale ? 'Père inconnu' : 'Mère inconnue')
                   : '${r.isFemale ? 'Avec' : 'Avec la mère'} ${partner.name}',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               '${l.bornAlive} nés vivants · ${l.kitsRemaining} au nid · ${l.weaned} sevrés'
               '${l.stillBorn + l.diedCount > 0 ? ' · ${l.stillBorn + l.diedCount} perte${l.stillBorn + l.diedCount > 1 ? 's' : ''}' : ''}',
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -620,7 +667,10 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: status == LitterStatus.weaningDue ? AppColors.statusAlertText : AppColors.primary,
+                color:
+                    status == LitterStatus.weaningDue
+                        ? AppColors.statusAlertText
+                        : AppColors.primary,
               ),
             ),
           ],
@@ -723,7 +773,11 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
               ),
               child: Row(
                 children: [
-                  CareCategoryIcon(due.category, size: 22, color: AppColors.primary),
+                  CareCategoryIcon(
+                    due.category,
+                    size: 22,
+                    color: AppColors.primary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -1197,10 +1251,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                   ListTile(
                     leading: CircleAvatar(
                       backgroundColor: AppColors.primarySoft,
-                      child: Icon(
-                        Icons.camera_alt,
-                        color: AppColors.primary,
-                      ),
+                      child: Icon(Icons.camera_alt, color: AppColors.primary),
                     ),
                     title: const Text('Prendre une photo'),
                     subtitle: const Text('Utiliser l\'appareil photo'),

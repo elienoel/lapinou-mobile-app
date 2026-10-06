@@ -73,6 +73,41 @@ void main() {
     expect(rabbit.copyWith(clearCage: true).toJson()['cage'], isNull);
   });
 
+  test(
+    'a rabbit assigned to a not-yet-synced cage keeps the local id in its '
+    'payload instead of dropping it, so SyncService can defer the push '
+    'until the cage itself has synced (regression: used to silently send '
+    'cage: null, losing the assignment)',
+    () {
+      final rabbit = Rabbit.fromJson({
+        'id': 1,
+        'name': 'Flash',
+        'tag_number': 'M1',
+        'gender': 'M',
+        'birth_date': '2025-01-01',
+      }).copyWith(cageId: 'cage-1727700000000', compartmentNumber: 2);
+
+      expect(rabbit.toJson()['cage'], 'cage-1727700000000');
+      expect(rabbit.toJson()['compartment_number'], 2);
+    },
+  );
+
+  test(
+    'a rabbit assigned to a not-yet-synced sire/dam keeps their local id too',
+    () {
+      final rabbit = Rabbit.fromJson({
+        'id': 1,
+        'name': 'Flash',
+        'tag_number': 'M1',
+        'gender': 'M',
+        'birth_date': '2025-01-01',
+      }).copyWith(sireId: 'rab-1727700000000', damId: 'rab-1727700000001');
+
+      expect(rabbit.toJson()['sire'], 'rab-1727700000000');
+      expect(rabbit.toJson()['dam'], 'rab-1727700000001');
+    },
+  );
+
   for (final count in [1, 3, 6]) {
     testWidgets('CageDiagram draws $count compartments', (tester) async {
       await tester.pumpWidget(

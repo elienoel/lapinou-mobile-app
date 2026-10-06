@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../models/litter.dart';
 import '../models/mating.dart';
+import '../models/rabbit.dart';
 import '../providers/auth_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
@@ -163,43 +165,44 @@ class _MatingsScreenState extends State<MatingsScreen>
                     const SizedBox(height: 14),
 
                     // Male selector
-                    DropdownButtonFormField<String>(
-                      value: selectedMaleId,
-                      decoration: const InputDecoration(
-                        labelText: 'Mâle reproducteur ♂',
-                        prefixIcon: Icon(Icons.male, color: AppColors.maleBlue),
-                      ),
-                      items:
-                          provider.males.map((m) {
-                            return DropdownMenuItem(
-                              value: m.id,
-                              child: Text('${m.name} (${m.tagNumber})'),
-                            );
-                          }).toList(),
-                      onChanged:
-                          (val) => setModalState(() => selectedMaleId = val),
+                    _ReproducerField(
+                      key: const ValueKey('mating-male-field'),
+                      label: 'Mâle reproducteur ♂',
+                      icon: Icons.male,
+                      accentColor: AppColors.maleBlue,
+                      selected: provider.getRabbitById(selectedMaleId),
+                      onTap: () async {
+                        final picked = await _pickReproducer(
+                          ctx,
+                          title: 'Choisir le mâle reproducteur',
+                          rabbits: provider.males,
+                          accentColor: AppColors.maleBlue,
+                        );
+                        if (picked != null) {
+                          setModalState(() => selectedMaleId = picked.id);
+                        }
+                      },
                     ),
                     const SizedBox(height: 12),
 
                     // Female selector
-                    DropdownButtonFormField<String>(
-                      value: selectedFemaleId,
-                      decoration: const InputDecoration(
-                        labelText: 'Femelle reproductrice ♀',
-                        prefixIcon: Icon(
-                          Icons.female,
-                          color: AppColors.femalePink,
-                        ),
-                      ),
-                      items:
-                          provider.females.map((f) {
-                            return DropdownMenuItem(
-                              value: f.id,
-                              child: Text('${f.name} (${f.tagNumber})'),
-                            );
-                          }).toList(),
-                      onChanged:
-                          (val) => setModalState(() => selectedFemaleId = val),
+                    _ReproducerField(
+                      key: const ValueKey('mating-female-field'),
+                      label: 'Femelle reproductrice ♀',
+                      icon: Icons.female,
+                      accentColor: AppColors.femalePink,
+                      selected: provider.getRabbitById(selectedFemaleId),
+                      onTap: () async {
+                        final picked = await _pickReproducer(
+                          ctx,
+                          title: 'Choisir la femelle reproductrice',
+                          rabbits: provider.females,
+                          accentColor: AppColors.femalePink,
+                        );
+                        if (picked != null) {
+                          setModalState(() => selectedFemaleId = picked.id);
+                        }
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -294,8 +297,7 @@ class _MatingsScreenState extends State<MatingsScreen>
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color:
-                                    Colors.white,
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -322,9 +324,7 @@ class _MatingsScreenState extends State<MatingsScreen>
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.primarySoftBorder,
-                        ),
+                        border: Border.all(color: AppColors.primarySoftBorder),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -678,86 +678,6 @@ class _MatingsScreenState extends State<MatingsScreen>
 
   // ---- Actions d'un accouplement ----
 
-  Future<void> _confirmPalpation(
-    BuildContext context,
-    RabbitProvider provider,
-    Mating m,
-  ) async {
-    final female = provider.getRabbitById(m.femaleId);
-    final today = DateTime.now();
-    final dayOnly = DateTime(today.year, today.month, today.day);
-    var date = dayOnly;
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder:
-                (ctx, setDialogState) => AlertDialog(
-                  title: const Text('Palpation effectuée'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Confirmez que la palpation de ${female?.name ?? 'la femelle'} a été faite et que la gestation est confirmée.',
-                      ),
-                      const SizedBox(height: 14),
-                      InkWell(
-                        key: const ValueKey('palpation-date'),
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: ctx,
-                            initialDate: date,
-                            firstDate: DateTime(
-                              m.matingDate.year,
-                              m.matingDate.month,
-                              m.matingDate.day,
-                            ),
-                            lastDate: dayOnly,
-                          );
-                          if (picked != null) {
-                            setDialogState(() => date = picked);
-                          }
-                        },
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Date de la palpation',
-                            prefixIcon: Icon(Icons.event_outlined, size: 20),
-                          ),
-                          child: Text(DateFormat('dd/MM/yyyy').format(date)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Annuler'),
-                    ),
-                    FilledButton(
-                      key: const ValueKey('palpation-confirm'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                      ),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Confirmer'),
-                    ),
-                  ],
-                ),
-          ),
-    );
-    if (ok != true || !mounted) return;
-
-    final error = await provider.confirmPalpation(m, doneAt: date);
-    if (!mounted) return;
-    _snack(
-      error ?? 'Palpation enregistrée : gestation confirmée',
-      error: error != null,
-    );
-  }
-
   Future<void> _confirmCancel(
     BuildContext context,
     RabbitProvider provider,
@@ -787,10 +707,7 @@ class _MatingsScreenState extends State<MatingsScreen>
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.primary,
-        ),
+        SnackBar(content: Text(message), backgroundColor: AppColors.primary),
       );
   }
 
@@ -826,242 +743,270 @@ class _MatingsScreenState extends State<MatingsScreen>
       ),
     };
 
-    return Container(
+    return InkWell(
       key: ValueKey('mating-${m.id}'),
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(5),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const AppIcon(AppIcons.mating, size: 30, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${female?.name ?? 'Femelle'} x ${male?.name ?? 'Mâle'}',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: badgeBg,
-                  border: Border.all(color: badgeFg),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  badgeText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: badgeFg,
-                  ),
-                ),
-              ),
-              PopupMenuButton<String>(
-                key: ValueKey('mating-menu-${m.id}'),
-                tooltip: 'Options',
-                icon: const Icon(
-                  Icons.more_vert_rounded,
-                  color: AppColors.textSecondary,
-                ),
-                onSelected: (v) {
-                  if (v == 'edit') {
-                    _showMatingDialog(context, provider, existing: m);
-                  }
-                  if (v == 'cancel') _confirmCancel(context, provider, m);
-                },
-                itemBuilder:
-                    (_) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_outlined, size: 20),
-                            SizedBox(width: 10),
-                            Flexible(child: Text('Modifier')),
-                          ],
-                        ),
-                      ),
-                      if (active)
-                        PopupMenuItem(
-                          value: 'cancel',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.cancel_outlined,
-                                size: 20,
-                                color: Colors.red.shade700,
-                              ),
-                              const SizedBox(width: 10),
-                              Flexible(
-                                child: Text(
-                                  'Annuler la saillie',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: Colors.red.shade700),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-              ),
-            ],
-          ),
-          if (active) ...[
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: AppColors.primarySoft,
-                valueColor: const AlwaysStoppedAnimation(
-                  AppColors.primary,
-                ),
-              ),
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      onTap: () => _showMatingTimeline(context, provider, m),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(5),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            const SizedBox(height: 6),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(
-                  child: Text(
-                    'Progression gestation',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                  ),
+                const AppIcon(
+                  AppIcons.mating,
+                  size: 30,
+                  color: AppColors.primary,
                 ),
                 const SizedBox(width: 8),
-                Flexible(
+                Expanded(
                   child: Text(
-                    daysRemaining > 0
-                        ? 'Mise bas dans ~$daysRemaining j'
-                        : 'Mise bas imminente !',
+                    '${female?.name ?? 'Femelle'} x ${male?.name ?? 'Mâle'}',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.scaffoldBackground,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                _buildDateRow(
-                  'Date de saillie',
-                  DateFormat('dd/MM/yyyy').format(m.matingDate),
-                ),
-                const SizedBox(height: 6),
-                _buildDateRow(
-                  m.palpationDoneAt != null || m.palpationDone
-                      ? 'Palpation effectuée'
-                      : 'Palpation (J12)',
-                  DateFormat(
-                    'dd/MM/yyyy',
-                  ).format(m.palpationDoneAt ?? m.palpationDate),
-                  isPast:
-                      m.palpationDone ||
-                      DateTime.now().isAfter(m.palpationDate),
-                ),
-                const SizedBox(height: 6),
-                _buildDateRow(
-                  'Pose Boîte à Nid (J28)',
-                  DateFormat('dd/MM/yyyy').format(m.nestBoxDate),
-                  isPast: DateTime.now().isAfter(m.nestBoxDate),
-                  isAlert: active && m.shouldInstallNestBox,
-                ),
-                const SizedBox(height: 6),
-                _buildDateRow(
-                  'Mise bas estimée (J31)',
-                  DateFormat('dd/MM/yyyy').format(m.expectedKindlingDate),
-                  highlight: true,
-                ),
-              ],
-            ),
-          ),
-          if (m.notes != null && m.notes!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Note: ${m.notes}',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-          if (active) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (!m.palpationDone)
-                  OutlinedButton.icon(
-                    key: ValueKey('palpation-${m.id}'),
-                    onPressed: () => _confirmPalpation(context, provider, m),
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Palpation effectuée'),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
                   ),
-                // Grisé tant que 21 jours ne se sont pas écoulés depuis la saillie
-                FilledButton.icon(
-                  key: ValueKey('kindle-${m.id}'),
-                  onPressed:
-                      m.canRegisterKindling
-                          ? () => showLitterForm(context, provider, mating: m)
-                          : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    border: Border.all(color: badgeFg),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  icon: const Icon(Icons.child_friendly_outlined, size: 18),
-                  label: const Text('Enregistrer la mise bas'),
+                  child: Text(
+                    badgeText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: badgeFg,
+                    ),
+                  ),
                 ),
-              ],
-            ),
-            if (!m.canRegisterKindling)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  'Mise bas possible à partir du ${DateFormat('dd/MM/yyyy').format(m.earliestKindlingDate)} '
-                  '(${Mating.minGestationDays} jours après la saillie).',
-                  key: ValueKey('kindle-hint-${m.id}'),
-                  style: const TextStyle(
-                    fontSize: 11.5,
+                PopupMenuButton<String>(
+                  key: ValueKey('mating-menu-${m.id}'),
+                  tooltip: 'Options',
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
                     color: AppColors.textSecondary,
                   ),
+                  onSelected: (v) {
+                    if (v == 'history') {
+                      _showMatingTimeline(context, provider, m);
+                    }
+                    if (v == 'edit') {
+                      _showMatingDialog(context, provider, existing: m);
+                    }
+                    if (v == 'cancel') _confirmCancel(context, provider, m);
+                  },
+                  itemBuilder:
+                      (_) => [
+                        const PopupMenuItem(
+                          value: 'history',
+                          child: Row(
+                            children: [
+                              Icon(Icons.timeline_outlined, size: 20),
+                              SizedBox(width: 10),
+                              Flexible(child: Text('Historique / Étapes')),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 20),
+                              SizedBox(width: 10),
+                              Flexible(child: Text('Modifier')),
+                            ],
+                          ),
+                        ),
+                        if (active)
+                          PopupMenuItem(
+                            value: 'cancel',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.cancel_outlined,
+                                  size: 20,
+                                  color: Colors.red.shade700,
+                                ),
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: Text(
+                                    'Annuler la saillie',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                ),
+              ],
+            ),
+            if (active) ...[
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: AppColors.primarySoft,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
                 ),
               ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Progression gestation',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      daysRemaining > 0
+                          ? 'Mise bas dans ~$daysRemaining j'
+                          : 'Mise bas imminente !',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.scaffoldBackground,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _buildDateRow(
+                    'Date de saillie',
+                    DateFormat('dd/MM/yyyy').format(m.matingDate),
+                  ),
+                  const SizedBox(height: 6),
+                  _buildDateRow(
+                    m.palpationDoneAt != null || m.palpationDone
+                        ? 'Palpation effectuée'
+                        : 'Palpation (J12)',
+                    DateFormat(
+                      'dd/MM/yyyy',
+                    ).format(m.palpationDoneAt ?? m.palpationDate),
+                    isPast:
+                        m.palpationDone ||
+                        DateTime.now().isAfter(m.palpationDate),
+                  ),
+                  const SizedBox(height: 6),
+                  _buildDateRow(
+                    'Pose Boîte à Nid (J28)',
+                    DateFormat('dd/MM/yyyy').format(m.nestBoxDate),
+                    isPast: DateTime.now().isAfter(m.nestBoxDate),
+                    isAlert: active && m.shouldInstallNestBox,
+                  ),
+                  const SizedBox(height: 6),
+                  _buildDateRow(
+                    'Mise bas estimée (J31)',
+                    DateFormat('dd/MM/yyyy').format(m.expectedKindlingDate),
+                    highlight: true,
+                  ),
+                ],
+              ),
+            ),
+            if (m.notes != null && m.notes!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Note: ${m.notes}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            if (active) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (!m.palpationDone)
+                    OutlinedButton.icon(
+                      key: ValueKey('palpation-${m.id}'),
+                      onPressed:
+                          () => confirmMatingPalpation(context, provider, m),
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text('Palpation effectuée'),
+                    ),
+                  // Grisé tant que 21 jours ne se sont pas écoulés depuis la saillie
+                  FilledButton.icon(
+                    key: ValueKey('kindle-${m.id}'),
+                    onPressed:
+                        m.canRegisterKindling
+                            ? () => showLitterForm(context, provider, mating: m)
+                            : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                    icon: const Icon(Icons.child_friendly_outlined, size: 18),
+                    label: const Text('Enregistrer la mise bas'),
+                  ),
+                ],
+              ),
+              if (!m.canRegisterKindling)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Mise bas possible à partir du ${DateFormat('dd/MM/yyyy').format(m.earliestKindlingDate)} '
+                    '(${Mating.minGestationDays} jours après la saillie).',
+                    key: ValueKey('kindle-hint-${m.id}'),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1142,8 +1087,7 @@ class _MatingsScreenState extends State<MatingsScreen>
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color:
-                isHighlight ? AppColors.primary : AppColors.textSecondary,
+            color: isHighlight ? AppColors.primary : AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 2),
@@ -1177,14 +1121,297 @@ class _MatingsScreenState extends State<MatingsScreen>
             color:
                 isPassed
                     ? Colors.grey.shade600
-                    : (isHighlight
-                        ? AppColors.primary
-                        : AppColors.textPrimary),
+                    : (isHighlight ? AppColors.primary : AppColors.textPrimary),
           ),
         ),
       ],
     );
   }
+
+  /// Historique complet d'un accouplement : saillie, palpation, boîte à nid,
+  /// mise bas et sevrage, avec ce qui a été fait (ou pas) à chaque étape.
+  void _showMatingTimeline(
+    BuildContext context,
+    RabbitProvider provider,
+    Mating m,
+  ) {
+    final male = provider.getRabbitById(m.maleId);
+    final female = provider.getRabbitById(m.femaleId);
+    Litter? litter;
+    for (final l in provider.litters) {
+      if (l.matingId == m.id) {
+        litter = l;
+        break;
+      }
+    }
+    final dateFmt = DateFormat('dd/MM/yyyy');
+    final failed = m.status == MatingStatus.failed;
+    final kindled = m.status == MatingStatus.kindled;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${female?.name ?? 'Femelle'} × ${male?.name ?? 'Mâle'}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'Suivi de la reproduction, étape par étape.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _timelineStep(
+                  icon: Icons.favorite_outline,
+                  done: true,
+                  title: 'Saillie',
+                  subtitle: 'Le ${dateFmt.format(m.matingDate)}',
+                ),
+                _timelineStep(
+                  icon: Icons.science_outlined,
+                  done: m.palpationDone,
+                  failed: failed,
+                  title: 'Palpation',
+                  subtitle:
+                      failed
+                          ? 'Non gestante'
+                          : (m.palpationDoneAt != null
+                              ? 'Faite le ${dateFmt.format(m.palpationDoneAt!)}'
+                              : (m.palpationDone
+                                  ? 'Gestation confirmée'
+                                  : 'Prévue le ${dateFmt.format(m.palpationDate)} — pas encore faite')),
+                ),
+                _timelineStep(
+                  icon: Icons.inventory_2_outlined,
+                  done: null,
+                  title: 'Pose de la boîte à nid',
+                  subtitle: 'Repère : vers le ${dateFmt.format(m.nestBoxDate)}',
+                ),
+                _timelineStep(
+                  icon: Icons.child_friendly_outlined,
+                  done: kindled,
+                  failed: failed,
+                  title: 'Mise bas',
+                  subtitle:
+                      failed
+                          ? 'Accouplement infructueux'
+                          : (litter != null
+                              ? 'Faite le ${dateFmt.format(litter.birthDate)} — ${litter.bornAlive} né(s) vivant(s)'
+                              : 'Prévue le ${dateFmt.format(m.expectedKindlingDate)} — pas encore faite'),
+                ),
+                _timelineStep(
+                  icon: Icons.pets_outlined,
+                  done: litter?.isWeaned,
+                  title: 'Sevrage',
+                  subtitle:
+                      litter == null
+                          ? 'Pas encore de portée enregistrée'
+                          : (litter.isWeaned
+                              ? 'Terminé${litter.weanedAt != null ? ' le ${dateFmt.format(litter.weanedAt!)}' : ''} (${litter.weaned}/${litter.bornAlive})'
+                              : 'Prévu vers le ${dateFmt.format(litter.calculatedWeaningDate)} — pas encore terminé'),
+                  isLast: true,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Une étape du suivi : [done] = true (faite), false (pas encore), ou null
+  /// quand l'étape est juste un repère sans statut suivi (ex. boîte à nid).
+  Widget _timelineStep({
+    required IconData icon,
+    required bool? done,
+    bool failed = false,
+    required String title,
+    required String subtitle,
+    bool isLast = false,
+  }) {
+    final (bg, fg) =
+        failed
+            ? (AppColors.statusAlertBg, AppColors.statusAlertText)
+            : done == true
+            ? (AppColors.statusActiveBg, AppColors.statusActiveText)
+            : done == false
+            ? (AppColors.statusPregnantBg, AppColors.statusPregnantText)
+            : (AppColors.scaffoldBackground, AppColors.textSecondary);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bg,
+              border: Border.all(color: fg),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              failed
+                  ? Icons.close_rounded
+                  : done == true
+                  ? Icons.check_rounded
+                  : icon,
+              size: 18,
+              color: fg,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Confirme la palpation d'un accouplement (gestation confirmée) en demandant
+/// la date à laquelle elle a été faite. Fonction partagée entre l'écran
+/// Accouplements et le rappel de la page d'accueil.
+Future<void> confirmMatingPalpation(
+  BuildContext context,
+  RabbitProvider provider,
+  Mating m,
+) async {
+  final female = provider.getRabbitById(m.femaleId);
+  final today = DateTime.now();
+  final dayOnly = DateTime(today.year, today.month, today.day);
+  var date = dayOnly;
+
+  final ok = await showDialog<bool>(
+    context: context,
+    builder:
+        (ctx) => StatefulBuilder(
+          builder:
+              (ctx, setDialogState) => AlertDialog(
+                title: const Text('Palpation effectuée'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Confirmez que la palpation de ${female?.name ?? 'la femelle'} a été faite et que la gestation est confirmée.',
+                    ),
+                    const SizedBox(height: 14),
+                    InkWell(
+                      key: const ValueKey('palpation-date'),
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: date,
+                          firstDate: DateTime(
+                            m.matingDate.year,
+                            m.matingDate.month,
+                            m.matingDate.day,
+                          ),
+                          lastDate: dayOnly,
+                        );
+                        if (picked != null) {
+                          setDialogState(() => date = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Date de la palpation',
+                          prefixIcon: Icon(Icons.event_outlined, size: 20),
+                        ),
+                        child: Text(DateFormat('dd/MM/yyyy').format(date)),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Annuler'),
+                  ),
+                  FilledButton(
+                    key: const ValueKey('palpation-confirm'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Confirmer'),
+                  ),
+                ],
+              ),
+        ),
+  );
+  if (ok != true || !context.mounted) return;
+
+  final error = await provider.confirmPalpation(m, doneAt: date);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(error ?? 'Palpation enregistrée : gestation confirmée'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
 }
 
 /// Confirmation d'annulation d'une saillie, avec un motif facultatif.
@@ -1239,6 +1466,207 @@ class _CancelMatingDialogState extends State<_CancelMatingDialog> {
           child: const Text('Annuler la saillie'),
         ),
       ],
+    );
+  }
+}
+
+/// Ouvre une liste de reproducteurs avec recherche (nom, matricule, race) et
+/// renvoie celui choisi, ou `null` si l'utilisateur annule.
+Future<Rabbit?> _pickReproducer(
+  BuildContext context, {
+  required String title,
+  required List<Rabbit> rabbits,
+  required Color accentColor,
+}) {
+  return showModalBottomSheet<Rabbit>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder:
+        (ctx) => _ReproducerPickerSheet(
+          title: title,
+          rabbits: rabbits,
+          accentColor: accentColor,
+        ),
+  );
+}
+
+/// Champ façon "select" qui ouvre le picker avec recherche au lieu d'un
+/// menu déroulant classique.
+class _ReproducerField extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color accentColor;
+  final Rabbit? selected;
+  final VoidCallback onTap;
+
+  const _ReproducerField({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.accentColor,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: accentColor),
+          suffixIcon: const Icon(Icons.search, size: 20),
+        ),
+        child: Text(
+          selected != null
+              ? '${selected!.name} (${selected!.tagNumber})'
+              : 'Choisir…',
+          style: TextStyle(
+            color:
+                selected != null ? AppColors.textPrimary : AppColors.textMuted,
+            fontWeight: selected != null ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReproducerPickerSheet extends StatefulWidget {
+  final String title;
+  final List<Rabbit> rabbits;
+  final Color accentColor;
+
+  const _ReproducerPickerSheet({
+    required this.title,
+    required this.rabbits,
+    required this.accentColor,
+  });
+
+  @override
+  State<_ReproducerPickerSheet> createState() => _ReproducerPickerSheetState();
+}
+
+class _ReproducerPickerSheetState extends State<_ReproducerPickerSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered =
+        widget.rabbits.where((r) {
+          if (_query.isEmpty) return true;
+          final q = _query.toLowerCase();
+          return r.name.toLowerCase().contains(q) ||
+              r.tagNumber.toLowerCase().contains(q) ||
+              r.breed.toLowerCase().contains(q);
+        }).toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (ctx, scrollController) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                key: const ValueKey('reproducer-search'),
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search, size: 20),
+                  hintText: 'Rechercher par nom, matricule, race...',
+                ),
+                onChanged: (v) => setState(() => _query = v),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child:
+                    filtered.isEmpty
+                        ? const Center(
+                          child: Text(
+                            'Aucun reproducteur trouvé.',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        )
+                        : ListView.separated(
+                          controller: scrollController,
+                          itemCount: filtered.length,
+                          separatorBuilder:
+                              (_, __) => const Divider(
+                                height: 1,
+                                color: Color(0xFFEDEFED),
+                              ),
+                          itemBuilder: (_, i) {
+                            final r = filtered[i];
+                            return ListTile(
+                              key: ValueKey('reproducer-option-${r.id}'),
+                              onTap: () => Navigator.pop(context, r),
+                              leading: CircleAvatar(
+                                backgroundColor: widget.accentColor.withAlpha(
+                                  30,
+                                ),
+                                child: Text(
+                                  r.name.isNotEmpty
+                                      ? r.name[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    color: widget.accentColor,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                r.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text('${r.tagNumber} • ${r.breed}'),
+                            );
+                          },
+                        ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

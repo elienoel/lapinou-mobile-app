@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cage.dart';
 import '../models/rabbit.dart';
 import '../providers/auth_provider.dart';
@@ -20,57 +19,15 @@ class RabbitListScreen extends StatefulWidget {
   State<RabbitListScreen> createState() => _RabbitListScreenState();
 }
 
-/// Façon d'afficher les lapins : cartes en grille, ou rangés dans leurs cages.
-enum RabbitListView { grid, cages }
-
 class _RabbitListScreenState extends State<RabbitListScreen> {
-  static const _viewPrefKey = 'rabbit_list_view';
-
   String _searchQuery = '';
   int _selectedFilterIndex = 0; // 0: Tous, 1: Mâles, 2: Femelles, 3: Gestantes
-  RabbitListView _view = RabbitListView.grid;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadViewPreference();
-  }
-
-  /// Retrouve la dernière vue choisie (grille ou cages)
-  Future<void> _loadViewPreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getString(_viewPrefKey) == RabbitListView.cages.name &&
-          mounted) {
-        setState(() => _view = RabbitListView.cages);
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _setView(RabbitListView view) async {
-    setState(() => _view = view);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_viewPrefKey, view.name);
-    } catch (_) {}
-  }
 
   bool _matches(Rabbit r, String query) =>
       r.name.toLowerCase().contains(query) ||
       r.tagNumber.toLowerCase().contains(query) ||
       r.breed.toLowerCase().contains(query) ||
       r.cageNumber.toLowerCase().contains(query);
-
-  bool _cageMatches(Cage c, String query) =>
-      c.name.toLowerCase().contains(query) ||
-      (c.location ?? '').toLowerCase().contains(query) ||
-      c.slots.any(
-        (slot) => slot.occupants.any(
-          (o) =>
-              o.name.toLowerCase().contains(query) ||
-              o.tagNumber.toLowerCase().contains(query),
-        ),
-      );
 
   void _addRabbit() {
     Navigator.push(
@@ -96,8 +53,6 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
         if (query.isNotEmpty) {
           filtered = filtered.where((r) => _matches(r, query)).toList();
         }
-
-        final inCagesView = _view == RabbitListView.cages;
 
         return Scaffold(
           appBar: AppBar(
@@ -144,21 +99,15 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
                   // 2. Recherche
                   SliverToBoxAdapter(child: _buildSearchBar()),
 
-                  // 3. Filtres (propres à la grille)
-                  if (!inCagesView)
-                    SliverToBoxAdapter(child: _buildFilterChips(provider)),
+                  // 3. Filtres
+                  SliverToBoxAdapter(child: _buildFilterChips(provider)),
 
-                  // 4. Choix de la vue
+                  // 4. Nombre de résultats
                   SliverToBoxAdapter(
-                    child: _buildViewToggle(
-                      inCagesView ? provider.rabbits.length : filtered.length,
-                    ),
+                    child: _buildResultsCount(filtered.length),
                   ),
 
-                  if (inCagesView)
-                    ..._buildCagesViewSlivers(context, provider, query)
-                  else
-                    ..._buildGridSlivers(filtered),
+                  ..._buildGridSlivers(filtered),
                 ],
               ),
             ),
@@ -297,45 +246,16 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
     );
   }
 
-  Widget _buildViewToggle(int count) {
+  Widget _buildResultsCount(int count) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '$count lapin${count > 1 ? 's' : ''}',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          SegmentedButton<RabbitListView>(
-            showSelectedIcon: false,
-            style: SegmentedButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              selectedBackgroundColor: AppColors.primary,
-              selectedForegroundColor: Colors.white,
-              foregroundColor: AppColors.textSecondary,
-            ),
-            segments: const [
-              ButtonSegment(
-                value: RabbitListView.grid,
-                icon: Icon(Icons.grid_view_rounded, size: 18),
-                label: Text('Grille'),
-              ),
-              ButtonSegment(
-                value: RabbitListView.cages,
-                icon: Icon(Icons.home_work_outlined, size: 18),
-                label: Text('Cages'),
-              ),
-            ],
-            selected: {_view},
-            onSelectionChanged: (v) => _setView(v.first),
-          ),
-        ],
+      child: Text(
+        '$count lapin${count > 1 ? 's' : ''}',
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }
@@ -369,108 +289,6 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
         ),
       ),
     );
-  }
-
-  // ---- Vue cages : chaque cage avec ses lapins dans leurs loges ----
-
-  List<Widget> _buildCagesViewSlivers(
-    BuildContext context,
-    RabbitProvider provider,
-    String query,
-  ) {
-    final allCages = provider.cages;
-    final cages =
-        query.isEmpty
-            ? allCages
-            : allCages.where((c) => _cageMatches(c, query)).toList();
-    var unassigned = provider.rabbits.where((r) => r.cageId == null).toList();
-    if (query.isNotEmpty) {
-      unassigned = unassigned.where((r) => _matches(r, query)).toList();
-    }
-
-    if (allCages.isEmpty && unassigned.isEmpty) {
-      return [
-        SliverToBoxAdapter(
-          child: SizedBox(height: 350, child: _buildEmptyState()),
-        ),
-      ];
-    }
-
-    final cardWidth = (MediaQuery.of(context).size.width - 36 - 14) / 2;
-
-    return [
-      if (allCages.isNotEmpty && query.isEmpty)
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
-          sliver: SliverToBoxAdapter(child: CageSummaryBar(cages: allCages)),
-        ),
-      if (allCages.isEmpty)
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
-          sliver: SliverToBoxAdapter(
-            child: _AddCageTile(wide: true, onTap: () => showCageForm(context)),
-          ),
-        ),
-      if (cages.isNotEmpty)
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-          sliver: SliverToBoxAdapter(
-            child: Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: [
-                for (final cage in cages)
-                  CageCard(cage: cage, width: cardWidth),
-              ],
-            ),
-          ),
-        ),
-      if (unassigned.isNotEmpty) ...[
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
-          sliver: SliverToBoxAdapter(
-            child: Row(
-              children: [
-                const Text(
-                  'Sans cage',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.statusPregnantBg,
-                    border: Border.all(color: AppColors.statusPregnantText),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${unassigned.length}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.statusPregnantText,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        _rabbitGridSliver(unassigned),
-      ] else
-        const SliverToBoxAdapter(child: SizedBox(height: 90)),
-      if (query.isNotEmpty && cages.isEmpty && unassigned.isEmpty)
-        SliverToBoxAdapter(
-          child: SizedBox(height: 300, child: _buildEmptyState()),
-        ),
-    ];
   }
 
   Widget _buildFilterChip(int index, String label) {
@@ -664,7 +482,9 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.statusPregnantBg,
-                            border: Border.all(color: AppColors.statusPregnantText),
+                            border: Border.all(
+                              color: AppColors.statusPregnantText,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(

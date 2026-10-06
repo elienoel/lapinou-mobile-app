@@ -8,11 +8,17 @@ import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/author_avatar.dart';
 import '../widgets/chat_icon_button.dart';
+import '../widgets/reminders.dart';
+import 'activity_screen.dart';
 import 'main_navigation_screen.dart';
 import 'rabbit_list_screen.dart';
 import 'matings_screen.dart';
 import 'care_screen.dart';
 import '../widgets/app_icon.dart';
+
+/// Horizon du rappel sur la page d'accueil : actions dues dans les 3 prochains
+/// jours (ou déjà en retard). Le reste est consultable sur la page Activité.
+const int _reminderHorizonDays = 3;
 
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
@@ -90,6 +96,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       balance,
                       currency,
                     ),
+
+                    const SizedBox(height: 20),
+
+                    // 2bis. Rappel : actions à mener dans les prochains jours
+                    _buildReminderSection(context, provider),
 
                     const SizedBox(height: 20),
 
@@ -177,10 +188,68 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 
+  /// Rappel horizontal des actions à mener dans les prochains jours (palpations,
+  /// mises bas, soins). Vide si rien n'est dû bientôt ; "Voir plus" ouvre la
+  /// page Activité avec toutes les actions, sans limite de délai.
+  Widget _buildReminderSection(BuildContext context, RabbitProvider provider) {
+    final all = buildReminders(provider);
+    final nearTerm =
+        all.where((i) => i.daysUntilDue <= _reminderHorizonDays).toList();
+    if (nearTerm.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'À faire bientôt',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+            TextButton(
+              onPressed:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ActivityScreen(),
+                    ),
+                  ),
+              child: const Text(
+                'Voir plus',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              for (final item in nearTerm) ...[
+                ReminderCard(item: item, provider: provider),
+                const SizedBox(width: 12),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Badge de la carte « Soins & entretien » : ce qu'il faut faire en priorité.
   String _careBadge(RabbitProvider provider) {
     final overdue =
-        provider.upcomingCares.where((c) => c.status == DueStatus.overdue).length;
+        provider.upcomingCares
+            .where((c) => c.status == DueStatus.overdue)
+            .length;
     if (overdue > 0) return '$overdue en retard';
     if (provider.pendingCareCount > 0) {
       return '${provider.pendingCareCount} à faire';
@@ -190,7 +259,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   String _careDetail(RabbitProvider provider) {
     final overdue =
-        provider.upcomingCares.where((c) => c.status == DueStatus.overdue).length;
+        provider.upcomingCares
+            .where((c) => c.status == DueStatus.overdue)
+            .length;
     if (overdue > 0) return '$overdue en retard';
     if (provider.pendingCareCount > 0) return 'À faire cette semaine';
     return 'Aucun soin en retard';
@@ -329,7 +400,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             icon: '💰',
             value: currency.format(balance, showSign: true, decimals: 0),
             label: 'Bilan clapier',
-            detail: 'Ventes: ${currency.format(totalIncome, showSign: true, decimals: 0)}',
+            detail:
+                'Ventes: ${currency.format(totalIncome, showSign: true, decimals: 0)}',
             badge: balance >= 0 ? 'Bénéfice' : 'Déficit',
           ),
         ],
@@ -381,13 +453,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        isHighlighted
-                            ? Colors.white
-                            : AppColors.primarySoft,
+                    color: isHighlighted ? Colors.white : AppColors.primarySoft,
                     border: Border.all(
-                      color:
-                          isHighlighted ? Colors.white : AppColors.primary,
+                      color: isHighlighted ? Colors.white : AppColors.primary,
                     ),
                     borderRadius: BorderRadius.circular(6),
                   ),
