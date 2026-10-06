@@ -668,40 +668,19 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                 // Name & Tag number
                 _buildSectionTitle('Identification'),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 6,
-                      child: TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Nom ou Surnom *',
-                          hintText: 'Ex: Bambou, Bella...',
-                          prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Veuillez saisir un nom';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 5,
-                      child: TextFormField(
-                        controller: _tagController,
-                        readOnly: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Matricule / Bague',
-                          prefixIcon: Icon(Icons.tag, size: 20),
-                          helperText: 'Généré automatiquement',
-                          helperMaxLines: 1,
-                        ),
-                      ),
-                    ),
-                  ],
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom ou Surnom *',
+                    hintText: 'Ex: Bambou, Bella...',
+                    prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Veuillez saisir un nom';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 16),
@@ -737,13 +716,21 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                 // Color
                 _buildSectionTitle('Robe / Couleur'),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      _coatColors
-                          .map((c) => _buildColorOption(c.$1, c.$2))
-                          .toList(),
+                SizedBox(
+                  height: 80,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _coatColors.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final c = _coatColors[index];
+                      return SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: _buildColorOption(c.$1, c.$2),
+                      );
+                    },
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -1031,41 +1018,28 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
 
   Widget _buildColorOption(String label, Color swatch) {
     final isSelected = _selectedColor == label;
+    final labelColor =
+        swatch.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
     return InkWell(
       onTap: () => setState(() => _selectedColor = label),
-      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withAlpha(25) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: swatch,
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.cardBorder,
-            width: isSelected ? 2 : 1,
+            width: isSelected ? 3 : 1,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: swatch,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.cardBorder, width: 1),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
-          ],
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: labelColor,
+          ),
         ),
       ),
     );
