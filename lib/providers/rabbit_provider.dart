@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/rabbit.dart';
+import '../models/breed.dart';
 import '../models/cage.dart';
 import '../models/mating.dart';
 import '../models/litter.dart';
@@ -13,6 +14,8 @@ import '../services/api_constants.dart';
 import '../services/connectivity_service.dart';
 import '../services/local_database.dart';
 import '../services/sync_service.dart';
+import '../services/validators.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PedigreeNode {
   final Rabbit rabbit;
@@ -48,6 +51,8 @@ class RabbitProvider extends ChangeNotifier {
       if (token != null && token.isNotEmpty) {
         fetchAll(token: token);
         SyncService.instance.syncNow();
+      } else {
+        _clearInMemoryData();
       }
     }
   }
@@ -144,6 +149,7 @@ class RabbitProvider extends ChangeNotifier {
     await Future.wait([
       fetchRabbits(token: token),
       fetchCages(token: token),
+      fetchBreeds(token: token),
       fetchMatings(token: token),
       fetchLitters(token: token),
       fetchCareEvents(token: token),
@@ -382,6 +388,56 @@ class RabbitProvider extends ChangeNotifier {
     return null;
   }
 
+  List<Breed> _breeds = [];
+  List<Breed> get breeds => List.unmodifiable(_breeds);
+
+  static const _cachedBreedsPrefsKey = 'cached_breeds';
+
+  /// Races de lapins (référentiel partagé, pas propre à l'utilisateur) : chargées depuis
+  /// un cache local en attendant le réseau, puis rafraîchies et mises en cache si en ligne.
+  Future<void> fetchBreeds({String? token}) async {
+    if (_breeds.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString(_cachedBreedsPrefsKey);
+        if (cached != null) {
+          final List list = jsonDecode(cached);
+          _breeds =
+              list
+                  .map((e) => Breed.fromJson(Map<String, dynamic>.from(e)))
+                  .toList();
+          notifyListeners();
+        }
+      } catch (e) {
+        debugPrint('Error loading cached breeds: $e');
+      }
+    }
+
+    final t = token ?? _token;
+    if (t == null || t.isEmpty) return;
+    if (!await ConnectivityService.instance.isOnline()) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConstants.breedsUrl}?all=true'),
+        headers: _headers(t),
+      );
+      if (response.statusCode == 200) {
+        final body = jsonDecode(utf8.decode(response.bodyBytes));
+        final List list = body['data'] is List ? body['data'] : [];
+        _breeds =
+            list
+                .map((e) => Breed.fromJson(Map<String, dynamic>.from(e)))
+                .toList();
+        notifyListeners();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_cachedBreedsPrefsKey, jsonEncode(list));
+      }
+    } catch (e) {
+      debugPrint('Error fetching breeds: $e');
+    }
+  }
+
   Future<void> fetchCages({String? token}) async {
     final local = await LocalDatabase.instance.getAll(SyncEntity.cage);
     _cages = local.map((c) => Cage.fromJson(c.data)).toList();
@@ -420,6 +476,32 @@ class RabbitProvider extends ChangeNotifier {
     bool isNew = true,
     String? token,
   }) async {
+    final sizeError = Validators.cageSize(
+      rows: cage.rowsCount,
+      columns: cage.columnsCount,
+    );
+    if (sizeError != null) return sizeError;
+    final sameName = _cages.any(
+      (c) =>
+          c.id != cage.id &&
+          c.name.trim().toLowerCase() == cage.name.trim().toLowerCase(),
+    );
+    if (sameName) return 'Une cage porte déjà ce nom.';
+    if (!isNew) {
+      final current = getCageById(cage.id);
+      if (current != null) {
+        final occupied =
+            current.slots.where((c) => !c.isFree).map((c) => c.number).toList();
+        if (cage.columnsCount != current.columnsCount && occupied.isNotEmpty) {
+          return 'Libérez les loges occupées avant de changer le nombre de colonnes.';
+        }
+        final highest =
+            occupied.isEmpty ? 0 : occupied.reduce((a, b) => a > b ? a : b);
+        if (highest > cage.compartmentsCount) {
+          return 'La loge $highest est occupée : libérez-la avant de réduire le nombre de lignes.';
+        }
+      }
+    }
     if (isNew) {
       final localId = 'cage-${DateTime.now().millisecondsSinceEpoch}';
       await SyncService.instance.recordCreate(
@@ -575,7 +657,23 @@ class RabbitProvider extends ChangeNotifier {
     DateTime? doneAt,
     String? token,
   }) {
+    if (mating.status != MatingStatus.pending) {
+      return Future.value("Cette saillie n'est plus en attente de palpation.");
+    }
     final d = doneAt ?? DateTime.now();
+    final today = DateTime.now();
+    final day = DateTime(d.year, d.month, d.day);
+    final matingDay = DateTime(
+      mating.matingDate.year,
+      mating.matingDate.month,
+      mating.matingDate.day,
+    );
+    if (day.isBefore(matingDay) ||
+        day.isAfter(DateTime(today.year, today.month, today.day))) {
+      return Future.value(
+        "La palpation doit avoir lieu entre la saillie et aujourd'hui.",
+      );
+    }
     return _matingAction(ApiConstants.matingPalpationUrl(mating.id), {
       'done_at':
           '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
@@ -584,6 +682,10 @@ class RabbitProvider extends ChangeNotifier {
 
   /// Annule la saillie (échec constaté, par exemple à la palpation) ; [reason] est ajouté aux notes.
   Future<String?> cancelMating(Mating mating, {String? reason, String? token}) {
+    if (mating.status != MatingStatus.pending &&
+        mating.status != MatingStatus.confirmed) {
+      return Future.value('Cette saillie est déjà terminée.');
+    }
     return _matingAction(ApiConstants.matingCancelUrl(mating.id), {
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
     }, token: token);
@@ -641,6 +743,13 @@ class RabbitProvider extends ChangeNotifier {
     return list;
   }
 
+  Litter? getLitterById(String? id) {
+    for (final l in _litters) {
+      if (l.id == id) return l;
+    }
+    return null;
+  }
+
   Mating? getMatingById(String? id) {
     if (id == null) return null;
     try {
@@ -692,7 +801,12 @@ class RabbitProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> addLitter(Litter litter, {String? token}) async {
+  /// Renvoie null si la mise bas est enregistrée, sinon le motif du refus.
+  Future<String?> addLitter(Litter litter, {String? token}) async {
+    if (litter.matingId != null &&
+        _litters.any((l) => l.matingId == litter.matingId)) {
+      return 'Une mise bas est déjà enregistrée pour cet accouplement.';
+    }
     _litters.insert(0, litter);
     _setLocalRabbitStatus(litter.motherId, RabbitStatus.lactating);
     final matingIdx = _matings.indexWhere((m) => m.id == litter.matingId);
@@ -717,7 +831,7 @@ class RabbitProvider extends ChangeNotifier {
         fetchCages(token: token),
       ]);
     }
-    return true;
+    return null;
   }
 
   /// Corrige une portée (effectifs, morts au nid, date de sevrage prévue, notes).
@@ -725,6 +839,11 @@ class RabbitProvider extends ChangeNotifier {
   Future<String?> updateLitter(Litter litter, {String? token}) async {
     final t = token ?? _token;
     if (t == null || t.isEmpty) return 'Session expirée';
+    final attached = litter.weaned + litter.diedCount;
+    if (litter.bornAlive < attached) {
+      return '${litter.weaned} sevré(s) et ${litter.diedCount} mort(s) au nid : '
+          'il ne peut pas y avoir moins de $attached né(s) vivant(s).';
+    }
     try {
       final response = await http.patch(
         Uri.parse(ApiConstants.litterDetailUrl(litter.id)),
@@ -761,6 +880,21 @@ class RabbitProvider extends ChangeNotifier {
   }) async {
     final t = token ?? _token;
     if (t == null || t.isEmpty) return 'Session expirée';
+    final litter = getLitterById(litterId);
+    if (litter != null) {
+      final remaining = litter.kitsRemaining;
+      if (remaining == 0)
+        return 'Tous les lapereaux de cette portée sont déjà sevrés.';
+      if (count < 1 || count > remaining) {
+        return 'Entre 1 et $remaining lapereau${remaining > 1 ? 'x' : ''} restent à sevrer.';
+      }
+      if (weanedAt.isBefore(litter.birthDate)) {
+        return 'Le sevrage ne peut pas précéder la naissance.';
+      }
+    }
+    if (kits.isNotEmpty && kits.length != count) {
+      return '$count fiche(s) attendue(s), ${kits.length} reçue(s).';
+    }
     try {
       final response = await http.post(
         Uri.parse(ApiConstants.litterWeanUrl(litterId)),
@@ -933,6 +1067,12 @@ class RabbitProvider extends ChangeNotifier {
     String? notes,
     String? token,
   }) async {
+    final sameName = _careTreatments.any(
+      (t) =>
+          t.id != id &&
+          t.name.trim().toLowerCase() == name.trim().toLowerCase(),
+    );
+    if (sameName) return 'Un type de soin porte déjà ce nom.';
     final payload = {
       'name': name,
       'category': category.apiValue,
@@ -989,6 +1129,14 @@ class RabbitProvider extends ChangeNotifier {
     String? notes,
     String? token,
   }) async {
+    final today = DateTime.now();
+    if (date.isAfter(DateTime(today.year, today.month, today.day))) {
+      return 'Un soin effectué ne peut pas être daté dans le futur.';
+    }
+    if (rabbitIds.isEmpty) return 'Sélectionnez au moins un lapin soigné.';
+    if (!_careTreatments.any((t) => t.id == treatmentId)) {
+      return "Ce type de soin n'existe pas dans votre élevage.";
+    }
     final payload = {
       'treatment': int.tryParse(treatmentId) ?? treatmentId,
       'rabbits': [for (final r in rabbitIds) int.tryParse(r) ?? r],
@@ -1088,6 +1236,42 @@ class RabbitProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Supprime une mise bas. L'accouplement qui lui était lié repasse en cours (il n'a
+  /// plus de mise bas), comme la gestation le serait : palpée ou non.
+  Future<String?> deleteLitter(Litter litter) async {
+    _litters.removeWhere((l) => l.id == litter.id);
+    final mating = getMatingById(litter.matingId);
+    if (mating != null && mating.status == MatingStatus.kindled) {
+      final reverted = mating.copyWith(
+        status:
+            mating.palpationDone
+                ? MatingStatus.confirmed
+                : MatingStatus.pending,
+      );
+      final idx = _matings.indexWhere((m) => m.id == mating.id);
+      if (idx != -1) _matings[idx] = reverted;
+      await SyncService.instance.recordUpdate(
+        SyncEntity.mating,
+        mating.id,
+        reverted.toJson(),
+      );
+    }
+    notifyListeners();
+    await SyncService.instance.recordDelete(SyncEntity.litter, litter.id);
+    return null;
+  }
+
+  /// Suppression refusée si une mise bas est déjà rattachée à l'accouplement (règle serveur).
+  Future<String?> deleteMating(String id, {String? token}) async {
+    if (_litters.any((l) => l.matingId == id)) {
+      return 'Cette saillie a une mise bas enregistrée : elle ne peut pas être supprimée.';
+    }
+    _matings.removeWhere((m) => m.id == id);
+    notifyListeners();
+    await SyncService.instance.recordDelete(SyncEntity.mating, id);
+    return null;
+  }
+
   Future<bool> deleteFinanceTransaction(String id, {String? token}) async {
     _finances.removeWhere((f) => f.id == id);
     notifyListeners();
@@ -1154,6 +1338,20 @@ class RabbitProvider extends ChangeNotifier {
   }
 
   /// Fixe le jeton sans lancer la synchronisation complète (tests).
+  /// Vide les données en mémoire (déconnexion) : la base locale est propre à chaque compte.
+  void _clearInMemoryData() {
+    _rabbits = [];
+    _cages = [];
+    _matings = [];
+    _litters = [];
+    _careEvents = [];
+    _careTreatments = [];
+    _careRecords = [];
+    _upcomingCares = [];
+    _finances = [];
+    notifyListeners();
+  }
+
   @visibleForTesting
   void setTokenForTesting(String? token) => _token = token;
 

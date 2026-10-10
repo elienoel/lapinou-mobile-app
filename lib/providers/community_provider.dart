@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/community_post.dart';
 import '../services/api_constants.dart';
+import '../services/validators.dart';
 
 class CommunityProvider extends ChangeNotifier {
   List<CommunityPost> _posts = [];
@@ -11,6 +12,9 @@ class CommunityProvider extends ChangeNotifier {
   String? _errorMessage;
 
   List<CommunityPost> get posts => _posts;
+
+  /// Motif du dernier refus côté app (fichier trop lourd, texte vide...), à afficher.
+  String? lastError;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -26,6 +30,13 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   /// 1. Récupérer le fil d'actualité
+  /// Déconnexion : on ne garde pas les publications du compte précédent à l'écran.
+  void clear() {
+    if (_posts.isEmpty) return;
+    _posts = [];
+    notifyListeners();
+  }
+
   Future<void> fetchPosts({String? token}) async {
     _isLoading = true;
     _errorMessage = null;
@@ -66,6 +77,19 @@ class CommunityProvider extends ChangeNotifier {
     String? tags,
     List<File> mediaFiles = const [],
   }) async {
+    lastError =
+        Validators.postContent(
+          content: content,
+          mediaCount: mediaFiles.length,
+        ) ??
+        Validators.postMediaCount(mediaFiles.length);
+    if (lastError == null) {
+      for (final file in mediaFiles) {
+        lastError = Validators.postMedia(file);
+        if (lastError != null) break;
+      }
+    }
+    if (lastError != null) return false;
     try {
       final request = http.MultipartRequest(
         'POST',
@@ -120,6 +144,7 @@ class CommunityProvider extends ChangeNotifier {
     required String emoji,
     required String token,
   }) async {
+    if (!Validators.reactionEmojis.contains(emoji)) return;
     final index = _posts.indexWhere((p) => p.id == postId);
     if (index == -1) return;
 
@@ -167,6 +192,7 @@ class CommunityProvider extends ChangeNotifier {
     required String emoji,
     required String token,
   }) async {
+    if (!Validators.reactionEmojis.contains(emoji)) return false;
     final oldMine = comment.myReaction;
     final oldReactions = comment.reactions;
     final oldCount = comment.likesCount;

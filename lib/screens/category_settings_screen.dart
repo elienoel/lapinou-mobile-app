@@ -26,7 +26,9 @@ class CategorySettingsScreen extends StatelessWidget {
             content: TextField(
               controller: controller,
               autofocus: true,
-              decoration: const InputDecoration(hintText: 'Ex: Location de matériel'),
+              decoration: const InputDecoration(
+                hintText: 'Ex: Location de matériel',
+              ),
               onSubmitted: (_) => Navigator.pop(ctx, true),
             ),
             actions: [
@@ -174,10 +176,16 @@ class CategorySettingsScreen extends StatelessWidget {
               ListTile(
                 key: ValueKey('add-category-${type.name}'),
                 dense: true,
-                leading: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+                leading: const Icon(
+                  Icons.add_circle_outline,
+                  color: AppColors.primary,
+                ),
                 title: const Text(
                   'Ajouter une catégorie',
-                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 onTap: () => _addCategory(context, type),
               ),

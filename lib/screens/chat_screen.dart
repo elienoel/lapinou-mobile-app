@@ -23,15 +23,17 @@ Future<void> startChatWithUser(BuildContext context, int userId) async {
 
   final conversation = await provider.openConversation(userId);
   if (conversation == null) {
-    messenger.showSnackBar(const SnackBar(
-      content: Text("Impossible d'ouvrir la discussion."),
-      backgroundColor: AppColors.primary,
-    ));
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text("Impossible d'ouvrir la discussion."),
+        backgroundColor: AppColors.primary,
+      ),
+    );
     return;
   }
-  navigator.push(MaterialPageRoute(
-    builder: (_) => ChatScreen(conversation: conversation),
-  ));
+  navigator.push(
+    MaterialPageRoute(builder: (_) => ChatScreen(conversation: conversation)),
+  );
 }
 
 class ChatScreen extends StatefulWidget {
@@ -123,8 +125,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _loading = true;
       _loadFailed = false;
     });
-    final page =
-        await context.read<ChatProvider>().fetchMessages(widget.conversation.id);
+    final page = await context.read<ChatProvider>().fetchMessages(
+      widget.conversation.id,
+    );
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -148,9 +151,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_polling || _loading || !mounted) return;
     _polling = true;
     try {
-      final page = await context
-          .read<ChatProvider>()
-          .fetchMessages(widget.conversation.id, afterId: _lastServerId);
+      final page = await context.read<ChatProvider>().fetchMessages(
+        widget.conversation.id,
+        afterId: _lastServerId,
+      );
       if (!mounted || page == null) return;
 
       final known = _messages.map((m) => m.id).toSet();
@@ -185,9 +189,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final before = _firstServerId;
     if (_loadingOlder || !_hasMore || before == null) return;
     setState(() => _loadingOlder = true);
-    final page = await context
-        .read<ChatProvider>()
-        .fetchMessages(widget.conversation.id, beforeId: before);
+    final page = await context.read<ChatProvider>().fetchMessages(
+      widget.conversation.id,
+      beforeId: before,
+    );
     if (!mounted) return;
     setState(() {
       _loadingOlder = false;
@@ -201,8 +206,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(0,
-            duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+        _scroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -235,12 +243,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _deliver(ChatMessage local) async {
     try {
       final sent = await context.read<ChatProvider>().sendMessage(
-            widget.conversation.id,
-            text: local.content,
-            image: local.localImagePath != null ? File(local.localImagePath!) : null,
-            audio: local.localAudioPath != null ? File(local.localAudioPath!) : null,
-            audioDurationMs: local.audioDurationMs,
-          );
+        widget.conversation.id,
+        text: local.content,
+        image:
+            local.localImagePath != null ? File(local.localImagePath!) : null,
+        audio:
+            local.localAudioPath != null ? File(local.localAudioPath!) : null,
+        audioDurationMs: local.audioDurationMs,
+      );
       if (!mounted) return;
       setState(() {
         final idx = _messages.indexWhere((m) => m.localId == local.localId);
@@ -252,7 +262,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       });
       // La note est sur le serveur : la copie temporaire n'est plus utile
       if (local.localAudioPath != null) {
-        File(local.localAudioPath!).delete().catchError((_) => File(local.localAudioPath!));
+        File(
+          local.localAudioPath!,
+        ).delete().catchError((_) => File(local.localAudioPath!));
       }
     } on ChatSendException catch (e) {
       if (!mounted) return;
@@ -260,10 +272,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         local.sending = false;
         local.failed = true;
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.message),
-        backgroundColor: AppColors.primary,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: AppColors.primary),
+      );
     }
   }
 
@@ -282,10 +293,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // ---- Notes vocales ----
 
   void _toastError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: AppColors.primary,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
+    );
   }
 
   Future<void> _startRecording() async {
@@ -295,7 +305,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!await recorder.requestPermission()) {
         await recorder.dispose();
         if (mounted) {
-          _toastError("Autorisez l'accès au micro dans les réglages pour envoyer des notes vocales.");
+          _toastError(
+            "Autorisez l'accès au micro dans les réglages pour envoyer des notes vocales.",
+          );
         }
         return;
       }
@@ -357,9 +369,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     if (auto) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Durée maximale de 5 minutes atteinte : message envoyé.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Durée maximale de 5 minutes atteinte : message envoyé.',
+          ),
+        ),
+      );
     }
 
     final local = ChatMessage(
@@ -387,10 +403,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (x != null && mounted) setState(() => _pendingImage = File(x.path));
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Impossible d'accéder à la photo."),
-          backgroundColor: AppColors.primary,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Impossible d'accéder à la photo."),
+            backgroundColor: AppColors.primary,
+          ),
+        );
       }
     }
   }
@@ -401,31 +419,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Photo depuis la galerie'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickImage(ImageSource.gallery);
-              },
+      builder:
+          (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Photo depuis la galerie'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_outlined),
+                  title: const Text('Prendre une photo'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Prendre une photo'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -435,9 +454,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final me = context.watch<AuthProvider>().user?.id ?? 0;
     final subtitle = [
-      if (_other.farmName != null && _other.farmName!.isNotEmpty && _other.farmName != _other.name)
+      if (_other.farmName != null &&
+          _other.farmName!.isNotEmpty &&
+          _other.farmName != _other.name)
         _other.farmName!,
-      if (_other.location != null && _other.location!.isNotEmpty) _other.location!,
+      if (_other.location != null && _other.location!.isNotEmpty)
+        _other.location!,
     ].join(' · ');
 
     return Scaffold(
@@ -490,14 +512,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget _buildBody(int me) {
     if (_loading) {
       return const Center(
-          child: CircularProgressIndicator(color: AppColors.primary));
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
     }
     if (_loadFailed) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.wifi_off_rounded, size: 40, color: AppColors.textMuted),
+            const Icon(
+              Icons.wifi_off_rounded,
+              size: 40,
+              color: AppColors.textMuted,
+            ),
             const SizedBox(height: 8),
             const Text('Impossible de charger les messages'),
             TextButton(onPressed: _loadInitial, child: const Text('Réessayer')),
@@ -546,8 +573,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final idx = count - 1 - i;
         final m = _messages[idx];
         final previous = idx > 0 ? _messages[idx - 1] : null;
-        final newDay = previous == null ||
-            DateUtils.dateOnly(previous.createdAt) != DateUtils.dateOnly(m.createdAt);
+        final newDay =
+            previous == null ||
+            DateUtils.dateOnly(previous.createdAt) !=
+                DateUtils.dateOnly(m.createdAt);
 
         return Column(
           children: [
@@ -577,7 +606,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
         child: Text(
           chatDayLabel(date),
-          style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+          style: const TextStyle(
+            fontSize: 11.5,
+            color: AppColors.textSecondary,
+          ),
         ),
       ),
     );
@@ -588,9 +620,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MediaViewerScreen(
-          media: [PostMedia(id: m.id, type: PostMediaType.image, url: m.imageUrl!)],
-        ),
+        builder:
+            (_) => MediaViewerScreen(
+              media: [
+                PostMedia(
+                  id: m.id,
+                  type: PostMediaType.image,
+                  url: m.imageUrl!,
+                ),
+              ],
+            ),
       ),
     );
   }
@@ -604,7 +643,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.file(_pendingImage!, height: 90, width: 90, fit: BoxFit.cover),
+            child: Image.file(
+              _pendingImage!,
+              height: 90,
+              width: 90,
+              fit: BoxFit.cover,
+            ),
           ),
           Positioned(
             top: 4,
@@ -646,8 +690,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       children: [
         IconButton(
           tooltip: 'Joindre une photo',
-          icon: const Icon(Icons.add_photo_alternate_outlined,
-              color: AppColors.primary),
+          icon: const Icon(
+            Icons.add_photo_alternate_outlined,
+            color: AppColors.primary,
+          ),
           onPressed: _showAttachOptions,
         ),
         Expanded(
@@ -660,8 +706,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               hintText: 'Écrire un message…',
               hintStyle: const TextStyle(fontSize: 14),
               isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
               filled: true,
               fillColor: AppColors.backgroundGrey,
               border: OutlineInputBorder(
@@ -699,13 +747,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       children: [
         IconButton(
           tooltip: 'Annuler',
-          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+          icon: const Icon(
+            Icons.delete_outline_rounded,
+            color: Colors.redAccent,
+          ),
           onPressed: () => _finishRecording(send: false),
         ),
         AnimatedOpacity(
           opacity: (_recordMs ~/ 600).isEven ? 1 : 0.25,
           duration: const Duration(milliseconds: 250),
-          child: const Icon(Icons.fiber_manual_record, color: Colors.red, size: 14),
+          child: const Icon(
+            Icons.fiber_manual_record,
+            color: Colors.red,
+            size: 14,
+          ),
         ),
         const SizedBox(width: 8),
         Text(
@@ -805,20 +860,26 @@ class _MessageBubble extends StatelessWidget {
                     onTap: m.imageUrl != null ? onOpenImage : null,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: m.localImagePath != null && m.imageUrl == null
-                          ? Image.file(File(m.localImagePath!),
-                              width: 220, height: 220, fit: BoxFit.cover)
-                          : Image.network(
-                              m.imageUrl!,
-                              width: 220,
-                              height: 220,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const SizedBox(
+                      child:
+                          m.localImagePath != null && m.imageUrl == null
+                              ? Image.file(
+                                File(m.localImagePath!),
                                 width: 220,
-                                height: 120,
-                                child: Icon(Icons.broken_image_outlined),
+                                height: 220,
+                                fit: BoxFit.cover,
+                              )
+                              : Image.network(
+                                m.imageUrl!,
+                                width: 220,
+                                height: 220,
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (_, __, ___) => const SizedBox(
+                                      width: 220,
+                                      height: 120,
+                                      child: Icon(Icons.broken_image_outlined),
+                                    ),
                               ),
-                            ),
                     ),
                   ),
                 ),
@@ -834,7 +895,11 @@ class _MessageBubble extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     m.content,
-                    style: TextStyle(fontSize: 14.5, color: textColor, height: 1.3),
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      color: textColor,
+                      height: 1.3,
+                    ),
                   ),
                 ),
               const SizedBox(height: 3),

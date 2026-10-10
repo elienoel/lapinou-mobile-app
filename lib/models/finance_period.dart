@@ -18,10 +18,7 @@ class FinancePeriod {
 
   factory FinancePeriod.custom(DateTimeRange range) => FinancePeriod(
     FinancePeriodKind.custom,
-    custom: DateTimeRange(
-      start: _day(range.start),
-      end: _day(range.end),
-    ),
+    custom: DateTimeRange(start: _day(range.start), end: _day(range.end)),
   );
 
   static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);

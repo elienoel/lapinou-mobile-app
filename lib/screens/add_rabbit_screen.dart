@@ -30,7 +30,8 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   late TextEditingController _notesController;
 
   RabbitGender _selectedGender = RabbitGender.female;
-  String _selectedBreed = 'Fauve de Bourgogne';
+  String? _selectedBreedId;
+  String _selectedBreedName = 'Fauve de Bourgogne';
   late String _selectedColor;
   RabbitStatus _selectedStatus = RabbitStatus.active;
   DateTime _birthDate = DateTime.now().subtract(const Duration(days: 180));
@@ -41,20 +42,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   int _avatarColorIndex = 0;
   File? _pickedPhotoFile;
   bool _isSaving = false;
-
-  static const List<String> _commonBreeds = [
-    'Fauve de Bourgogne',
-    'Géant des Flandres',
-    'Néo-Zélandais',
-    'Californien',
-    'Rex',
-    'Papillon Français',
-    'Argenté de Champagne',
-    'Bélier Français',
-    'Chinchilla',
-    'Gris du Bourbonnais',
-    'Autre / Croisé',
-  ];
 
   static const List<(String, Color)> _coatColors = [
     ('Fauve', Color(0xFFC97A3D)),
@@ -74,6 +61,13 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<RabbitProvider>(context, listen: false).fetchBreeds(
+          token: Provider.of<AuthProvider>(context, listen: false).token,
+        );
+      }
+    });
     final edit = widget.initialRabbitToEdit;
     _nameController = TextEditingController(text: edit?.name ?? '');
     _cageController = TextEditingController(text: edit?.cageNumber ?? '');
@@ -84,8 +78,8 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
 
     if (edit != null) {
       _selectedGender = edit.gender;
-      _selectedBreed =
-          _commonBreeds.contains(edit.breed) ? edit.breed : _commonBreeds.first;
+      _selectedBreedId = edit.breedId;
+      _selectedBreedName = edit.breed;
       _selectedStatus = edit.status;
       _birthDate = edit.birthDate;
       _selectedFatherId = edit.sireId;
@@ -101,7 +95,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
             : _coatColors.first.$1;
 
     _tagController = TextEditingController(
-      text: edit?.tagNumber ?? _generateTagNumber(_selectedBreed),
+      text: edit?.tagNumber ?? _generateTagNumber(_selectedBreedName),
     );
   }
 
@@ -192,10 +186,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                   ListTile(
                     leading: CircleAvatar(
                       backgroundColor: AppColors.primarySoft,
-                      child: Icon(
-                        Icons.camera_alt,
-                        color: AppColors.primary,
-                      ),
+                      child: Icon(Icons.camera_alt, color: AppColors.primary),
                     ),
                     title: const Text('Prendre une photo'),
                     onTap: () {
@@ -388,14 +379,43 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     );
   }
 
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
+    );
+  }
+
   Future<void> _saveRabbit() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_isSaving || !_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final provider = Provider.of<RabbitProvider>(context, listen: false);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final tag = _tagController.text.trim().toUpperCase();
+    final editingId = widget.initialRabbitToEdit?.id;
+    final tagTaken = provider.rabbits.any(
+      (r) => r.id != editingId && r.tagNumber.toUpperCase() == tag,
+    );
+    if (_selectedCageId != null && _selectedCompartment == null) {
+      _showError('Indiquez la loge de la cage.');
+      return;
+    }
+    if (_selectedCageId == null && _selectedCompartment != null) {
+      _showError("Sélectionnez d'abord une cage.");
+      return;
+    }
+    if (tagTaken) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('La bague $tag est déjà utilisée dans votre élevage.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
       return;
     }
 
     setState(() => _isSaving = true);
-    final provider = Provider.of<RabbitProvider>(context, listen: false);
-    final auth = Provider.of<AuthProvider>(context, listen: false);
 
     final newRabbit = Rabbit(
       id:
@@ -404,7 +424,8 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       name: _nameController.text.trim(),
       tagNumber: _tagController.text.trim().toUpperCase(),
       gender: _selectedGender,
-      breed: _selectedBreed,
+      breed: _selectedBreedName,
+      breedId: _selectedBreedId,
       birthDate: _birthDate,
       color: _selectedColor,
       cageNumber: _resolveCageNumber(provider),
@@ -686,28 +707,37 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                 const SizedBox(height: 16),
 
                 // Breed
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: _selectedBreed,
-                  decoration: const InputDecoration(
-                    labelText: 'Race *',
-                    prefixIcon: Icon(Icons.pets, size: 20),
-                  ),
-                  items:
-                      _commonBreeds.map((b) {
-                        return DropdownMenuItem(
-                          value: b,
-                          child: Text(b, overflow: TextOverflow.ellipsis),
-                        );
-                      }).toList(),
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      _selectedBreed = val;
-                      if (widget.initialRabbitToEdit == null) {
-                        _tagController.text = _generateTagNumber(val);
-                      }
-                    });
+                _buildSectionTitle('Race *'),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final breeds = context.watch<RabbitProvider>().breeds;
+                    return SizedBox(
+                      height: 100,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        clipBehavior: Clip.none,
+                        itemCount: breeds.length + 1,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          if (index == breeds.length) {
+                            return _buildBreedCard(
+                              name: 'Autre / Croisé',
+                              imageUrl: null,
+                              selected: _selectedBreedId == null,
+                              onTap: () => _selectBreed(null, 'Autre / Croisé'),
+                            );
+                          }
+                          final b = breeds[index];
+                          return _buildBreedCard(
+                            name: b.name,
+                            imageUrl: b.imageUrl,
+                            selected: _selectedBreedId == b.id,
+                            onTap: () => _selectBreed(b.id, b.name),
+                          );
+                        },
+                      ),
+                    );
                   },
                 ),
 
@@ -1012,6 +1042,100 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
         fontSize: 15,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
+      ),
+    );
+  }
+
+  void _selectBreed(String? breedId, String breedName) {
+    setState(() {
+      _selectedBreedId = breedId;
+      _selectedBreedName = breedName;
+      if (widget.initialRabbitToEdit == null) {
+        _tagController.text = _generateTagNumber(breedName);
+      }
+    });
+  }
+
+  Widget _buildBreedCard({
+    required String name,
+    required String? imageUrl,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      key: ValueKey('breed-${imageUrl ?? name}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 140,
+        height: 96,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.cardBorder,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              right: 54,
+              child: Text(
+                name,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -10,
+              right: -10,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child:
+                    imageUrl != null
+                        ? Image.network(
+                          ApiConstants.formatMediaUrl(imageUrl),
+                          width: 58,
+                          height: 58,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) => _breedIconFallback(selected),
+                        )
+                        : _breedIconFallback(selected),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _breedIconFallback(bool selected) {
+    return Container(
+      width: 58,
+      height: 58,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? Colors.white.withAlpha(35) : AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected ? Colors.white : AppColors.cardBorder,
+        ),
+      ),
+      child: Icon(
+        Icons.pets,
+        color: selected ? Colors.white : AppColors.primary,
+        size: 24,
       ),
     );
   }

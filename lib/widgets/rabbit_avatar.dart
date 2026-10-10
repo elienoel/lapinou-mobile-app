@@ -101,6 +101,10 @@ class RabbitAvatar extends StatelessWidget {
   }
 
   Widget _buildEmojiFallback(double size) {
-    return AppIcon(AppIcons.rabbit, size: size * 0.56, color: AppColors.primary);
+    return AppIcon(
+      AppIcons.rabbit,
+      size: size * 0.56,
+      color: AppColors.primary,
+    );
   }
 }

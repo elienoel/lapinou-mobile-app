@@ -33,11 +33,18 @@ class LapinouApp extends StatelessWidget {
                   (rabbitProvider ?? RabbitProvider())..setToken(auth.token),
         ),
         ChangeNotifierProvider.value(value: SyncService.instance),
-        ChangeNotifierProvider(create: (_) => CommunityProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, CommunityProvider>(
+          create: (_) => CommunityProvider(),
+          update: (_, auth, community) {
+            if (auth.token == null) (community ?? CommunityProvider()).clear();
+            return community ?? CommunityProvider();
+          },
+        ),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create: (_) => ChatProvider(),
-          update: (_, auth, chat) => (chat ?? ChatProvider())..setToken(auth.token),
+          update:
+              (_, auth, chat) => (chat ?? ChatProvider())..setToken(auth.token),
         ),
       ],
       child: MaterialApp(

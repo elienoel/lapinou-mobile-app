@@ -26,14 +26,14 @@ class RecordVoiceRecorder implements VoiceRecorder {
 
   @override
   Future<void> start(String path) => _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 64000,
-          sampleRate: 44100,
-          numChannels: 1,
-        ),
-        path: path,
-      );
+    const RecordConfig(
+      encoder: AudioEncoder.aacLc,
+      bitRate: 64000,
+      sampleRate: 44100,
+      numChannels: 1,
+    ),
+    path: path,
+  );
 
   @override
   Future<String?> stop() => _recorder.stop();
@@ -109,6 +109,6 @@ class VoiceServices {
 
   static VoicePlayback Function({String? url, String? filePath}) playback =
       ({url, filePath}) => AudioplayersPlayback(
-            filePath != null ? DeviceFileSource(filePath) : UrlSource(url!),
-          );
+        filePath != null ? DeviceFileSource(filePath) : UrlSource(url!),
+      );
 }

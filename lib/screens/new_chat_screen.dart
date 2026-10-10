@@ -64,15 +64,17 @@ class _NewChatScreenState extends State<NewChatScreen> {
     setState(() => _opening = false);
 
     if (conversation == null) {
-      messenger.showSnackBar(const SnackBar(
-        content: Text("Impossible d'ouvrir la discussion."),
-        backgroundColor: AppColors.primary,
-      ));
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Impossible d'ouvrir la discussion."),
+          backgroundColor: AppColors.primary,
+        ),
+      );
       return;
     }
-    navigator.pushReplacement(MaterialPageRoute(
-      builder: (_) => ChatScreen(conversation: conversation),
-    ));
+    navigator.pushReplacement(
+      MaterialPageRoute(builder: (_) => ChatScreen(conversation: conversation)),
+    );
   }
 
   @override
@@ -112,45 +114,58 @@ class _NewChatScreenState extends State<NewChatScreen> {
           ),
           if (_opening) const LinearProgressIndicator(minHeight: 2),
           Expanded(
-            child: _loading && _users.isEmpty
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary))
-                : _users.isEmpty
+            child:
+                _loading && _users.isEmpty
                     ? const Center(
-                        child: Text(
-                          'Aucun éleveur trouvé',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: _users.length,
-                        separatorBuilder: (_, __) => const Divider(
-                            height: 1, indent: 72, color: Color(0xFFEDEFED)),
-                        itemBuilder: (context, i) {
-                          final u = _users[i];
-                          final sub = [
-                            if (u.farmName != null &&
-                                u.farmName!.isNotEmpty &&
-                                u.farmName != u.name)
-                              u.farmName!,
-                            if (u.location != null && u.location!.isNotEmpty)
-                              u.location!,
-                          ].join(' · ');
-                          return ListTile(
-                            tileColor: Colors.white,
-                            leading: AuthorAvatar(
-                                name: u.name, url: u.avatar, radius: 22),
-                            title: Text(
-                              u.name,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: sub.isEmpty ? null : Text(sub),
-                            trailing: const Icon(Icons.chevron_right,
-                                color: AppColors.textMuted),
-                            onTap: () => _start(u),
-                          );
-                        },
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
                       ),
+                    )
+                    : _users.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'Aucun éleveur trouvé',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    )
+                    : ListView.separated(
+                      itemCount: _users.length,
+                      separatorBuilder:
+                          (_, __) => const Divider(
+                            height: 1,
+                            indent: 72,
+                            color: Color(0xFFEDEFED),
+                          ),
+                      itemBuilder: (context, i) {
+                        final u = _users[i];
+                        final sub = [
+                          if (u.farmName != null &&
+                              u.farmName!.isNotEmpty &&
+                              u.farmName != u.name)
+                            u.farmName!,
+                          if (u.location != null && u.location!.isNotEmpty)
+                            u.location!,
+                        ].join(' · ');
+                        return ListTile(
+                          tileColor: Colors.white,
+                          leading: AuthorAvatar(
+                            name: u.name,
+                            url: u.avatar,
+                            radius: 22,
+                          ),
+                          title: Text(
+                            u.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: sub.isEmpty ? null : Text(sub),
+                          trailing: const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.textMuted,
+                          ),
+                          onTap: () => _start(u),
+                        );
+                      },
+                    ),
           ),
         ],
       ),

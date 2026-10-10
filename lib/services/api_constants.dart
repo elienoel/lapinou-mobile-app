@@ -33,9 +33,11 @@ class ApiConstants {
 
   // Messagerie privée
   static String get chatConversationsUrl => '$baseUrl/chat/conversations/';
-  static String get chatUnreadUrl => '$baseUrl/chat/conversations/unread-count/';
+  static String get chatUnreadUrl =>
+      '$baseUrl/chat/conversations/unread-count/';
   static String get chatUsersUrl => '$baseUrl/chat/conversations/users/';
-  static String chatMessagesUrl(int conversationId) => '$baseUrl/chat/conversations/$conversationId/messages/';
+  static String chatMessagesUrl(int conversationId) =>
+      '$baseUrl/chat/conversations/$conversationId/messages/';
 
   // Documentation Swagger
   static String get swaggerDocsUrl => '$baseUrl/docs/';
@@ -69,8 +71,10 @@ class ApiConstants {
 
   static String get matingsUrl => '$baseUrl/farm/matings/';
   static String matingDetailUrl(String id) => '$baseUrl/farm/matings/$id/';
-  static String matingPalpationUrl(String id) => '$baseUrl/farm/matings/$id/palpation/';
-  static String matingCancelUrl(String id) => '$baseUrl/farm/matings/$id/cancel/';
+  static String matingPalpationUrl(String id) =>
+      '$baseUrl/farm/matings/$id/palpation/';
+  static String matingCancelUrl(String id) =>
+      '$baseUrl/farm/matings/$id/cancel/';
 
   static String get littersUrl => '$baseUrl/farm/litters/';
   static String litterDetailUrl(String id) => '$baseUrl/farm/litters/$id/';

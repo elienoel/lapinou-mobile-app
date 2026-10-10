@@ -56,6 +56,42 @@ class _LittersViewState extends State<LittersView> {
     );
   }
 
+  Future<void> _confirmDelete(Litter lit) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final provider = context.read<RabbitProvider>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Supprimer cette mise bas ?'),
+            content: const Text(
+              "L'accouplement lié repassera en cours. Cette action est définitive.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annuler'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Supprimer'),
+              ),
+            ],
+          ),
+    );
+    if (ok != true || !mounted) return;
+    await provider.deleteLitter(lit);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Mise bas supprimée'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
+  }
+
   Future<void> _edit(Litter lit) async {
     final messenger = ScaffoldMessenger.of(context);
     final done = await showEditLitterSheet(context, lit);
@@ -75,9 +111,11 @@ class _LittersViewState extends State<LittersView> {
       builder: (context, provider, child) {
         final all = provider.litters;
         final totalKits = provider.totalKitsInNests;
-        final atNestCount = all.where((l) => l.status != LitterStatus.weaned).length;
+        final atNestCount =
+            all.where((l) => l.status != LitterStatus.weaned).length;
         final toWeanCount = provider.littersToWeanCount;
-        final weanedCount = all.where((l) => l.status == LitterStatus.weaned).length;
+        final weanedCount =
+            all.where((l) => l.status == LitterStatus.weaned).length;
         final shown = all.where(_matches).toList();
 
         return RefreshIndicator(
@@ -89,7 +127,9 @@ class _LittersViewState extends State<LittersView> {
             ]);
           },
           child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 96),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,7 +155,9 @@ class _LittersViewState extends State<LittersView> {
                 if (shown.isEmpty)
                   _buildEmptyLitters(all.isEmpty)
                 else
-                  ...shown.map((lit) => _buildLitterItem(context, lit, provider)),
+                  ...shown.map(
+                    (lit) => _buildLitterItem(context, lit, provider),
+                  ),
               ],
             ),
           ),
@@ -178,7 +220,11 @@ class _LittersViewState extends State<LittersView> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const AppIcon(AppIcons.nest, size: 46, color: AppColors.primary),
+            child: const AppIcon(
+              AppIcons.nest,
+              size: 46,
+              color: AppColors.primary,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -310,7 +356,11 @@ class _LittersViewState extends State<LittersView> {
           children: [
             Row(
               children: [
-                const AppIcon(AppIcons.nest, size: 28, color: AppColors.primary),
+                const AppIcon(
+                  AppIcons.nest,
+                  size: 28,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -495,6 +545,13 @@ class _LittersViewState extends State<LittersView> {
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     label: const Text('Modifier'),
                   ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  key: ValueKey('delete-${lit.id}'),
+                  tooltip: 'Supprimer la mise bas',
+                  onPressed: () => _confirmDelete(lit),
+                  icon: Icon(Icons.delete_outline, color: Colors.red.shade700),
                 ),
               ],
             ),

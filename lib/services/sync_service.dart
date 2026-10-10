@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -15,12 +16,62 @@ enum SyncStatus { idle, syncing, error }
 /// remapper un id local (uuid) vers l'id définitif attribué par le serveur une
 /// fois qu'une dépendance créée hors-ligne est synchronisée (ex. une portée créée
 /// hors-ligne référence une mère elle-même créée hors-ligne).
+final _uuidPattern = RegExp(
+  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+);
+
+String _newUuidV4() {
+  final random = Random.secure();
+  final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
+      '${hex.substring(16, 20)}-${hex.substring(20)}';
+}
+
+/// Enregistrement refusé par le serveur (erreur de validation) : conservé en local
+/// pour que l'utilisateur voie le motif et puisse le relancer.
+class RejectedRecord {
+  final SyncEntity entity;
+  final String localId;
+  final String? serverId;
+  final String name;
+  final String error;
+  final Map<String, dynamic> data;
+
+  const RejectedRecord({
+    required this.entity,
+    required this.localId,
+    required this.serverId,
+    required this.name,
+    required this.error,
+    required this.data,
+  });
+
+  String get entityLabel => switch (entity) {
+    SyncEntity.rabbit => 'Lapin',
+    SyncEntity.cage => 'Cage',
+    SyncEntity.mating => 'Accouplement',
+    SyncEntity.litter => 'Mise bas',
+    SyncEntity.careTreatment => 'Type de soin',
+    SyncEntity.careRecord => 'Soin',
+    SyncEntity.careEvent => 'Suivi',
+    SyncEntity.finance => 'Transaction',
+  };
+}
+
 class _ForeignKeyRef {
   final SyncEntity entity;
   final String field;
   final SyncEntity target;
   final bool isList;
-  const _ForeignKeyRef(this.entity, this.field, this.target, {this.isList = false});
+  const _ForeignKeyRef(
+    this.entity,
+    this.field,
+    this.target, {
+    this.isList = false,
+  });
 }
 
 class _EntityConfig {
@@ -46,11 +97,21 @@ class SyncService extends ChangeNotifier {
   int _pendingCount = 0;
   String? _lastError;
   DateTime? _lastSyncedAt;
+  List<RejectedRecord> _rejected = [];
+  List<ActionLogEntry> _history = [];
   StreamSubscription<bool>? _connectivitySub;
 
   SyncStatus get status => _status;
   int get pendingCount => _pendingCount;
   String? get lastError => _lastError;
+  List<RejectedRecord> get rejected => List.unmodifiable(_rejected);
+
+  /// Toutes les actions faites sur l'appareil (récentes d'abord).
+  List<ActionLogEntry> get history => List.unmodifiable(_history);
+
+  /// Actions pas encore envoyées au serveur.
+  List<ActionLogEntry> get pendingActions =>
+      _history.where((a) => a.status == 'pending').toList();
   DateTime? get lastSyncedAt => _lastSyncedAt;
 
   static final Map<SyncEntity, _EntityConfig> _configs = {
@@ -97,8 +158,17 @@ class SyncService extends ChangeNotifier {
     _ForeignKeyRef(SyncEntity.litter, 'mother', SyncEntity.rabbit),
     _ForeignKeyRef(SyncEntity.litter, 'father', SyncEntity.rabbit),
     _ForeignKeyRef(SyncEntity.careEvent, 'rabbit', SyncEntity.rabbit),
-    _ForeignKeyRef(SyncEntity.careRecord, 'treatment', SyncEntity.careTreatment),
-    _ForeignKeyRef(SyncEntity.careRecord, 'rabbits', SyncEntity.rabbit, isList: true),
+    _ForeignKeyRef(
+      SyncEntity.careRecord,
+      'treatment',
+      SyncEntity.careTreatment,
+    ),
+    _ForeignKeyRef(
+      SyncEntity.careRecord,
+      'rabbits',
+      SyncEntity.rabbit,
+      isList: true,
+    ),
     _ForeignKeyRef(SyncEntity.rabbit, 'sire', SyncEntity.rabbit),
     _ForeignKeyRef(SyncEntity.rabbit, 'dam', SyncEntity.rabbit),
     _ForeignKeyRef(SyncEntity.rabbit, 'cage', SyncEntity.cage),
@@ -110,7 +180,9 @@ class SyncService extends ChangeNotifier {
 
   void start() {
     ConnectivityService.instance.start();
-    _connectivitySub ??= ConnectivityService.instance.onOnlineChanged.listen((online) {
+    _connectivitySub ??= ConnectivityService.instance.onOnlineChanged.listen((
+      online,
+    ) {
       if (online) syncNow();
     });
     refreshPendingCount();
@@ -123,20 +195,41 @@ class SyncService extends ChangeNotifier {
 
   Future<void> refreshPendingCount() async {
     _pendingCount = await _db.pendingCount();
+    _history = await _db.actionLog();
     notifyListeners();
   }
 
   Map<String, String> _headers() => {
-        'Content-Type': 'application/json',
-        if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
-      };
+    'Content-Type': 'application/json',
+    if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+  };
 
   /// Enregistre une création (en ligne ou non) : écrit en local, enfile l'opération,
   /// puis tente une synchro immédiate si une connexion est disponible.
-  Future<void> recordCreate(SyncEntity entity, String localId, Map<String, dynamic> payload) async {
-    final body = {...payload, 'client_uuid': localId};
+  Future<void> recordCreate(
+    SyncEntity entity,
+    String localId,
+    Map<String, dynamic> payload,
+  ) async {
+    // Le serveur attend un UUID : l'id local (« rab-123… ») ne peut pas être envoyé tel quel.
+    final clientUuid = _uuidPattern.hasMatch(localId) ? localId : _newUuidV4();
+    final body = {...payload, 'client_uuid': clientUuid};
     await _db.upsertLocal(entity, localId, body, isDirty: true);
-    await _db.enqueue(entity: entity, localId: localId, operation: 'create', payload: body, clientUuid: localId);
+    final queueId = await _db.enqueue(
+      entity: entity,
+      localId: localId,
+      operation: 'create',
+      payload: body,
+      clientUuid: clientUuid,
+    );
+    await _db.logAction(
+      entity: entity,
+      localId: localId,
+      operation: 'create',
+      label: _labelFor(entity, body),
+      status: 'pending',
+      queueId: queueId,
+    );
     await refreshPendingCount();
     await _syncIfOnline();
   }
@@ -144,19 +237,54 @@ class SyncService extends ChangeNotifier {
   /// Enregistre une modification. Si l'enregistrement n'a encore jamais été
   /// synchronisé (création encore en attente), la modification est fusionnée dans
   /// cette création plutôt que d'être mise en file à part.
-  Future<void> recordUpdate(SyncEntity entity, String localId, Map<String, dynamic> payload) async {
+  Future<void> recordUpdate(
+    SyncEntity entity,
+    String localId,
+    Map<String, dynamic> payload,
+  ) async {
     final queue = await _db.pendingQueue();
-    final pendingCreate = queue.where((q) => q.entity == entity && q.localId == localId && q.operation == 'create');
+    final pendingCreate = queue.where(
+      (q) =>
+          q.entity == entity && q.localId == localId && q.operation == 'create',
+    );
     if (pendingCreate.isNotEmpty) {
       final item = pendingCreate.first;
       final merged = {...item.payload, ...payload};
       await _db.updateQueuePayload(item.id, merged);
       await _db.upsertLocal(entity, localId, merged, isDirty: true);
+      await _db.logAction(
+        entity: entity,
+        localId: localId,
+        operation: 'update',
+        label: _labelFor(entity, merged),
+        status: 'pending',
+        queueId: item.id,
+      );
       await _syncIfOnline();
       return;
     }
-    await _db.upsertLocal(entity, localId, payload, isDirty: true, serverId: localId);
-    await _db.enqueue(entity: entity, localId: localId, operation: 'update', payload: payload, clientUuid: localId);
+    await _db.upsertLocal(
+      entity,
+      localId,
+      payload,
+      isDirty: true,
+      serverId: localId,
+    );
+    final updateQueueId = await _db.enqueue(
+      entity: entity,
+      localId: localId,
+      operation: 'update',
+      payload: payload,
+      clientUuid: localId,
+    );
+    await _db.logAction(
+      entity: entity,
+      localId: localId,
+      operation: 'update',
+      label: _labelFor(entity, payload),
+      status: 'pending',
+      queueId: updateQueueId,
+    );
     await refreshPendingCount();
     await _syncIfOnline();
   }
@@ -165,18 +293,40 @@ class SyncService extends ChangeNotifier {
   /// synchronisée, elle n'a jamais existé côté serveur : on annule simplement tout.
   Future<void> recordDelete(SyncEntity entity, String localId) async {
     final queue = await _db.pendingQueue();
-    final pendingCreate = queue.where((q) => q.entity == entity && q.localId == localId && q.operation == 'create');
+    final pendingCreate = queue.where(
+      (q) =>
+          q.entity == entity && q.localId == localId && q.operation == 'create',
+    );
     if (pendingCreate.isNotEmpty) {
       await _db.dequeue(pendingCreate.first.id);
+      await _db.setActionStatus(pendingCreate.first.id, 'cancelled');
       await _db.removeLocal(entity, localId);
       await refreshPendingCount();
       return;
     }
-    for (final q in queue.where((q) => q.entity == entity && q.localId == localId && q.operation == 'update')) {
+    for (final q in queue.where(
+      (q) =>
+          q.entity == entity && q.localId == localId && q.operation == 'update',
+    )) {
       await _db.dequeue(q.id);
+      await _db.setActionStatus(q.id, 'cancelled');
     }
     await _db.markDeletedLocal(entity, localId);
-    await _db.enqueue(entity: entity, localId: localId, operation: 'delete', payload: const {}, clientUuid: localId);
+    final deleteQueueId = await _db.enqueue(
+      entity: entity,
+      localId: localId,
+      operation: 'delete',
+      payload: const {},
+      clientUuid: localId,
+    );
+    await _db.logAction(
+      entity: entity,
+      localId: localId,
+      operation: 'delete',
+      label: _labelFor(entity, const {}),
+      status: 'pending',
+      queueId: deleteQueueId,
+    );
     await refreshPendingCount();
     await _syncIfOnline();
   }
@@ -202,9 +352,18 @@ class SyncService extends ChangeNotifier {
       // _push() s'arrête sans lever d'exception dès qu'un item échoue (réseau ou
       // serveur) pour ne pas bloquer les suivants indéfiniment : s'il reste des
       // éléments en file, ce n'est donc pas un vrai succès même sans exception.
+      await _reloadRejected();
       final stillPending = await _db.pendingCount();
-      _status = stillPending == 0 ? SyncStatus.idle : SyncStatus.error;
-      if (stillPending == 0) _lastError = null;
+      _status =
+          stillPending == 0 && _rejected.isEmpty
+              ? SyncStatus.idle
+              : SyncStatus.error;
+      if (_status == SyncStatus.idle) {
+        _lastError = null;
+      } else if (_rejected.isNotEmpty && stillPending == 0) {
+        _lastError =
+            '${_rejected.length} modification${_rejected.length > 1 ? 's' : ''} refusée${_rejected.length > 1 ? 's' : ''} par le serveur.';
+      }
     } catch (e) {
       debugPrint('Sync error: $e');
       _status = SyncStatus.error;
@@ -216,7 +375,85 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  bool _looksUnresolved(dynamic value) => value != null && int.tryParse(value.toString()) == null;
+  String _labelFor(SyncEntity entity, Map<String, dynamic> payload) {
+    final name = payload['name'] ?? payload['title'];
+    if (name != null && '$name'.isNotEmpty) return '$name';
+    return switch (entity) {
+      SyncEntity.rabbit => 'Lapin',
+      SyncEntity.cage => 'Cage',
+      SyncEntity.mating => 'Accouplement',
+      SyncEntity.litter => 'Mise bas',
+      SyncEntity.careTreatment => 'Type de soin',
+      SyncEntity.careRecord => 'Soin',
+      SyncEntity.careEvent => 'Suivi',
+      SyncEntity.finance => 'Transaction',
+    };
+  }
+
+  Future<void> _reloadRejected() async {
+    final found = <RejectedRecord>[];
+    for (final entity in SyncEntity.values) {
+      for (final record in await _db.getAll(entity)) {
+        final error = record.data['_syncError'];
+        if (error == null) continue;
+        found.add(
+          RejectedRecord(
+            entity: entity,
+            localId: record.localId,
+            serverId: record.serverId,
+            name:
+                '${record.data['name'] ?? record.data['title'] ?? record.localId}',
+            error: '$error',
+            data: record.data,
+          ),
+        );
+      }
+    }
+    _rejected = found;
+    notifyListeners();
+  }
+
+  /// Renvoie au serveur les enregistrements refusés une fois corrigés. Les anciens
+  /// envois utilisaient l'id local comme `client_uuid` : on lui donne un UUID valide.
+  Future<void> retryRejected() async {
+    await _reloadRejected();
+    for (final item in _rejected) {
+      final payload = Map<String, dynamic>.from(item.data)
+        ..remove('_syncError');
+      final current = payload['client_uuid']?.toString();
+      if (current == null || !_uuidPattern.hasMatch(current)) {
+        payload['client_uuid'] = _newUuidV4();
+      }
+      await _db.upsertLocal(
+        item.entity,
+        item.localId,
+        payload,
+        isDirty: true,
+        serverId: item.serverId,
+      );
+      final retryQueueId = await _db.enqueue(
+        entity: item.entity,
+        localId: item.localId,
+        operation: item.serverId == null ? 'create' : 'update',
+        payload: payload,
+        clientUuid: payload['client_uuid'].toString(),
+      );
+      await _db.logAction(
+        entity: item.entity,
+        localId: item.localId,
+        operation: item.serverId == null ? 'create' : 'update',
+        label: _labelFor(item.entity, payload),
+        status: 'pending',
+        queueId: retryQueueId,
+      );
+    }
+    await refreshPendingCount();
+    await _syncIfOnline();
+    await _reloadRejected();
+  }
+
+  bool _looksUnresolved(dynamic value) =>
+      value != null && int.tryParse(value.toString()) == null;
 
   bool _hasUnresolvedForeignKey(SyncQueueItem item) {
     for (final ref in _foreignKeys.where((r) => r.entity == item.entity)) {
@@ -281,13 +518,16 @@ class SyncService extends ChangeNotifier {
           return true;
       }
     } catch (e) {
-      debugPrint('Network error syncing ${item.entity.name} ${item.operation}: $e');
+      debugPrint(
+        'Network error syncing ${item.entity.name} ${item.operation}: $e',
+      );
       _lastError = 'Connexion au serveur impossible ($e).';
       return false;
     }
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       if (item.operation == 'delete') {
+        await _db.setActionStatus(item.id, 'sent');
         await _db.dequeue(item.id);
         return true;
       }
@@ -298,16 +538,25 @@ class SyncService extends ChangeNotifier {
         await _db.confirmSynced(item.entity, item.localId, serverId, data);
         await _remapEverywhere(item.entity, item.localId, serverId);
       } else {
-        await _db.upsertLocal(item.entity, serverId, data, isDirty: false, serverId: serverId);
+        await _db.upsertLocal(
+          item.entity,
+          serverId,
+          data,
+          isDirty: false,
+          serverId: serverId,
+        );
       }
+      await _db.setActionStatus(item.id, 'sent');
       await _db.dequeue(item.id);
       return true;
     }
 
     if (response.statusCode == 404 && item.operation != 'create') {
       // Déjà supprimé côté serveur : on abandonne aussi localement.
+      await _db.setActionStatus(item.id, 'sent');
       await _db.dequeue(item.id);
-      if (item.operation == 'update') await _db.removeLocal(item.entity, item.localId);
+      if (item.operation == 'update')
+        await _db.removeLocal(item.entity, item.localId);
       return true;
     }
 
@@ -316,13 +565,17 @@ class SyncService extends ChangeNotifier {
       // consigne sur l'enregistrement local pour qu'elle reste consultable et on
       // retire l'opération de la file pour ne pas bloquer les suivantes.
       final error = _extractError(response);
-      final current = Map<String, dynamic>.from(item.payload)..['_syncError'] = error;
+      final current = Map<String, dynamic>.from(item.payload)
+        ..['_syncError'] = error;
       await _db.upsertLocal(item.entity, item.localId, current, isDirty: true);
+      await _db.setActionStatus(item.id, 'rejected', error: error);
       await _db.dequeue(item.id);
       return true;
     }
 
-    debugPrint('Sync push failed (${response.statusCode}) for ${item.entity.name}: ${response.body}');
+    debugPrint(
+      'Sync push failed (${response.statusCode}) for ${item.entity.name}: ${response.body}',
+    );
     _lastError = 'Le serveur a renvoyé une erreur (${response.statusCode}).';
     return false;
   }
@@ -344,10 +597,20 @@ class SyncService extends ChangeNotifier {
   /// Remplace [fromId] par [toId] partout où une entité peut y faire référence :
   /// dans les données déjà en base locale, et dans les opérations encore en file
   /// (pas encore envoyées) qui pointaient vers cet id temporaire.
-  Future<void> _remapEverywhere(SyncEntity syncedEntity, String fromId, String toId) async {
+  Future<void> _remapEverywhere(
+    SyncEntity syncedEntity,
+    String fromId,
+    String toId,
+  ) async {
     final refs = _foreignKeys.where((r) => r.target == syncedEntity);
     for (final ref in refs) {
-      await _db.remapForeignKey(ref.entity, ref.field, fromId, toId, isList: ref.isList);
+      await _db.remapForeignKey(
+        ref.entity,
+        ref.field,
+        fromId,
+        toId,
+        isList: ref.isList,
+      );
 
       final queue = await _db.pendingQueue();
       for (final q in queue.where((q) => q.entity == ref.entity)) {
@@ -376,8 +639,13 @@ class SyncService extends ChangeNotifier {
       final config = entry.value;
       final prefsKey = 'sync_last_${entity.name}';
       final lastSync = prefs.getString(prefsKey);
-      final since = lastSync != null ? '&updated_at_from=${Uri.encodeComponent(lastSync)}' : '';
-      final uri = Uri.parse('${config.listUrl()}?all=true&include_deleted=true$since');
+      final since =
+          lastSync != null
+              ? '&updated_at_from=${Uri.encodeComponent(lastSync)}'
+              : '';
+      final uri = Uri.parse(
+        '${config.listUrl()}?all=true&include_deleted=true$since',
+      );
 
       try {
         final response = await http.get(uri, headers: _headers());
@@ -400,10 +668,14 @@ class SyncService extends ChangeNotifier {
         for (final id in deletedIds) {
           await _db.deleteConfirmedByServer(entity, id);
         }
-        await prefs.setString(prefsKey, DateTime.now().toUtc().toIso8601String());
+        await prefs.setString(
+          prefsKey,
+          DateTime.now().toUtc().toIso8601String(),
+        );
       } catch (e) {
         debugPrint('Pull failed for ${entity.name}: $e');
-        _lastError = 'Impossible de récupérer les dernières données du serveur ($e).';
+        _lastError =
+            'Impossible de récupérer les dernières données du serveur ($e).';
       }
     }
   }

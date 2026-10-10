@@ -3,7 +3,8 @@ import '../services/api_constants.dart';
 int _asInt(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
 
 DateTime _asDate(dynamic v) =>
-    (v != null ? DateTime.tryParse(v.toString()) : null)?.toLocal() ?? DateTime.now();
+    (v != null ? DateTime.tryParse(v.toString()) : null)?.toLocal() ??
+    DateTime.now();
 
 class ChatUser {
   final int id;
@@ -21,12 +22,12 @@ class ChatUser {
   });
 
   factory ChatUser.fromJson(Map<String, dynamic> json) => ChatUser(
-        id: _asInt(json['id']),
-        name: (json['name'] ?? 'Éleveur').toString(),
-        farmName: json['farm_name']?.toString(),
-        location: json['location']?.toString(),
-        avatar: json['avatar']?.toString(),
-      );
+    id: _asInt(json['id']),
+    name: (json['name'] ?? 'Éleveur').toString(),
+    farmName: json['farm_name']?.toString(),
+    location: json['location']?.toString(),
+    avatar: json['avatar']?.toString(),
+  );
 }
 
 class ChatMessage {
@@ -76,20 +77,24 @@ class ChatMessage {
       (localAudioPath != null && localAudioPath!.isNotEmpty);
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
-        id: _asInt(json['id']),
-        senderId: _asInt(json['sender']),
-        content: (json['content'] ?? '').toString(),
-        imageUrl: json['image'] == null
+    id: _asInt(json['id']),
+    senderId: _asInt(json['sender']),
+    content: (json['content'] ?? '').toString(),
+    imageUrl:
+        json['image'] == null
             ? null
             : ApiConstants.formatMediaUrl(json['image'].toString()),
-        audioUrl: json['audio'] == null
+    audioUrl:
+        json['audio'] == null
             ? null
             : ApiConstants.formatMediaUrl(json['audio'].toString()),
-        audioDurationMs:
-            json['audio_duration_ms'] == null ? null : _asInt(json['audio_duration_ms']),
-        createdAt: _asDate(json['created_at']),
-        isRead: json['is_read'] == true,
-      );
+    audioDurationMs:
+        json['audio_duration_ms'] == null
+            ? null
+            : _asInt(json['audio_duration_ms']),
+    createdAt: _asDate(json['created_at']),
+    isRead: json['is_read'] == true,
+  );
 }
 
 /// Aperçu du dernier message d'une discussion
@@ -115,12 +120,12 @@ class ChatPreview {
   }
 
   factory ChatPreview.fromJson(Map<String, dynamic> json) => ChatPreview(
-        senderId: _asInt(json['sender']),
-        content: (json['content'] ?? '').toString(),
-        hasImage: json['has_image'] == true,
-        hasAudio: json['has_audio'] == true,
-        createdAt: _asDate(json['created_at']),
-      );
+    senderId: _asInt(json['sender']),
+    content: (json['content'] ?? '').toString(),
+    hasImage: json['has_image'] == true,
+    hasAudio: json['has_audio'] == true,
+    createdAt: _asDate(json['created_at']),
+  );
 }
 
 class ChatConversation {
@@ -138,12 +143,16 @@ class ChatConversation {
     required this.updatedAt,
   });
 
-  factory ChatConversation.fromJson(Map<String, dynamic> json) => ChatConversation(
+  factory ChatConversation.fromJson(Map<String, dynamic> json) =>
+      ChatConversation(
         id: _asInt(json['id']),
         other: ChatUser.fromJson(Map<String, dynamic>.from(json['other_user'])),
-        last: json['last_message'] == null
-            ? null
-            : ChatPreview.fromJson(Map<String, dynamic>.from(json['last_message'])),
+        last:
+            json['last_message'] == null
+                ? null
+                : ChatPreview.fromJson(
+                  Map<String, dynamic>.from(json['last_message']),
+                ),
         unread: _asInt(json['unread_count']),
         updatedAt: _asDate(json['updated_at']),
       );
@@ -157,5 +166,9 @@ class ChatPage {
   /// Mes messages jusqu'à cet identifiant ont été lus par mon interlocuteur
   final int? myReadUpTo;
 
-  const ChatPage({required this.messages, this.hasMore = false, this.myReadUpTo});
+  const ChatPage({
+    required this.messages,
+    this.hasMore = false,
+    this.myReadUpTo,
+  });
 }

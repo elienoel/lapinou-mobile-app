@@ -56,18 +56,23 @@ class Litter {
   int get kitsRemaining => math.max(bornAlive - weaned - diedCount, 0);
 
   /// Âge de la portée en jours (0 le jour de la naissance).
-  int get ageDays => _dateOnly(DateTime.now()).difference(_dateOnly(birthDate)).inDays;
+  int get ageDays =>
+      _dateOnly(DateTime.now()).difference(_dateOnly(birthDate)).inDays;
 
   DateTime get calculatedWeaningDate =>
       weaningDate ?? birthDate.add(const Duration(days: defaultWeaningDays));
 
   /// Jours avant la date prévue de sevrage ; négatif quand elle est dépassée.
   int get daysUntilWeaning =>
-      _dateOnly(calculatedWeaningDate).difference(_dateOnly(DateTime.now())).inDays;
+      _dateOnly(
+        calculatedWeaningDate,
+      ).difference(_dateOnly(DateTime.now())).inDays;
 
   LitterStatus get status {
     if (kitsRemaining == 0) return LitterStatus.weaned;
-    return daysUntilWeaning <= 0 ? LitterStatus.weaningDue : LitterStatus.nursing;
+    return daysUntilWeaning <= 0
+        ? LitterStatus.weaningDue
+        : LitterStatus.nursing;
   }
 
   /// Plus aucun lapereau à sevrer (le sevrage se confirme à la main, il ne se déduit plus de la date).
@@ -75,7 +80,10 @@ class Litter {
 
   /// Avancement vers la date de sevrage prévue, de 0 (naissance) à 1.
   double get weaningProgress {
-    final total = _dateOnly(calculatedWeaningDate).difference(_dateOnly(birthDate)).inDays;
+    final total =
+        _dateOnly(
+          calculatedWeaningDate,
+        ).difference(_dateOnly(birthDate)).inDays;
     return total <= 0 ? 1.0 : (ageDays / total).clamp(0.0, 1.0);
   }
 
@@ -109,7 +117,8 @@ class Litter {
   factory Litter.fromJson(Map<String, dynamic> json) {
     DateTime parsedBirthDate = DateTime.now();
     if (json['birth_date'] != null) {
-      parsedBirthDate = DateTime.tryParse(json['birth_date'].toString()) ?? DateTime.now();
+      parsedBirthDate =
+          DateTime.tryParse(json['birth_date'].toString()) ?? DateTime.now();
     }
 
     DateTime? parsedWeaningDate;
@@ -130,7 +139,8 @@ class Litter {
       bornAlive: _int(json['born_alive']),
       stillBorn: _int(json['still_born']),
       diedCount: _int(json['died_count']),
-      weanedCount: json['weaned_count'] == null ? null : _int(json['weaned_count']),
+      weanedCount:
+          json['weaned_count'] == null ? null : _int(json['weaned_count']),
       weanedAt: parsedWeanedAt,
       weaningDate: parsedWeaningDate,
       notes: json['notes'],
@@ -139,9 +149,9 @@ class Litter {
 
   Map<String, dynamic> toJson() {
     return {
-      if (matingId != null && int.tryParse(matingId!) != null) 'mating': int.tryParse(matingId!),
+      if (matingId != null) 'mating': int.tryParse(matingId!) ?? matingId,
       'mother': int.tryParse(motherId) ?? motherId,
-      if (fatherId != null && int.tryParse(fatherId!) != null) 'father': int.tryParse(fatherId!),
+      if (fatherId != null) 'father': int.tryParse(fatherId!) ?? fatherId,
       'birth_date': _isoDate(birthDate),
       'born_alive': bornAlive,
       'still_born': stillBorn,
@@ -153,10 +163,10 @@ class Litter {
 
   /// Champs modifiables d'une portée existante (le sevrage passe par [RabbitProvider.weanLitter]).
   Map<String, dynamic> toEditJson() => {
-        'born_alive': bornAlive,
-        'still_born': stillBorn,
-        'died_count': diedCount,
-        if (weaningDate != null) 'weaning_date': _isoDate(weaningDate!),
-        'notes': notes ?? '',
-      };
+    'born_alive': bornAlive,
+    'still_born': stillBorn,
+    'died_count': diedCount,
+    if (weaningDate != null) 'weaning_date': _isoDate(weaningDate!),
+    'notes': notes ?? '',
+  };
 }

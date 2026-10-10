@@ -438,6 +438,22 @@ class _MatingsScreenState extends State<MatingsScreen>
                             );
                             final notes = notesController.text.trim();
                             final messenger = ScaffoldMessenger.of(context);
+                            final sire = provider.getRabbitById(selectedMaleId);
+                            final dam = provider.getRabbitById(
+                              selectedFemaleId,
+                            );
+                            if (sire?.gender != RabbitGender.male ||
+                                dam?.gender != RabbitGender.female) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Le mâle doit être un mâle et la femelle une femelle.',
+                                  ),
+                                  backgroundColor: Colors.red.shade700,
+                                ),
+                              );
+                              return;
+                            }
                             if (isEdit) {
                               provider
                                   .updateMating(
@@ -678,6 +694,50 @@ class _MatingsScreenState extends State<MatingsScreen>
 
   // ---- Actions d'un accouplement ----
 
+  Future<void> _confirmDeleteMating(
+    BuildContext context,
+    RabbitProvider provider,
+    Mating m,
+  ) async {
+    final female = provider.getRabbitById(m.femaleId)?.name ?? 'la femelle';
+    final male = provider.getRabbitById(m.maleId)?.name ?? 'le mâle';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Supprimer cette saillie ?'),
+            content: Text(
+              'La saillie $female × $male sera retirée de la liste. Cette action est définitive.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annuler'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Supprimer'),
+              ),
+            ],
+          ),
+    );
+    if (ok != true || !context.mounted) return;
+    final error = await provider.deleteMating(m.id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Saillie supprimée'),
+          backgroundColor:
+              error == null ? AppColors.primary : Colors.red.shade700,
+        ),
+      );
+  }
+
   Future<void> _confirmCancel(
     BuildContext context,
     RabbitProvider provider,
@@ -721,6 +781,13 @@ class _MatingsScreenState extends State<MatingsScreen>
     final male = provider.getRabbitById(m.maleId);
     final female = provider.getRabbitById(m.femaleId);
     final active = m.isActive;
+    Litter? litter;
+    for (final l in provider.litters) {
+      if (l.matingId == m.id) {
+        litter = l;
+        break;
+      }
+    }
 
     final daysRemaining = m.daysUntilKindling;
     final progress = (m.gestationDay / 31.0).clamp(0.0, 1.0);
@@ -818,6 +885,9 @@ class _MatingsScreenState extends State<MatingsScreen>
                       _showMatingDialog(context, provider, existing: m);
                     }
                     if (v == 'cancel') _confirmCancel(context, provider, m);
+                    if (v == 'delete') {
+                      _confirmDeleteMating(context, provider, m);
+                    }
                   },
                   itemBuilder:
                       (_) => [
@@ -838,6 +908,25 @@ class _MatingsScreenState extends State<MatingsScreen>
                               Icon(Icons.edit_outlined, size: 20),
                               SizedBox(width: 10),
                               Flexible(child: Text('Modifier')),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: Colors.red.shade700,
+                              ),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  'Supprimer',
+                                  style: TextStyle(color: Colors.red.shade700),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -944,9 +1033,12 @@ class _MatingsScreenState extends State<MatingsScreen>
                   ),
                   const SizedBox(height: 6),
                   _buildDateRow(
-                    'Mise bas estimée (J31)',
-                    DateFormat('dd/MM/yyyy').format(m.expectedKindlingDate),
-                    highlight: true,
+                    litter != null ? 'Mise bas' : 'Mise bas estimée (J31)',
+                    DateFormat(
+                      'dd/MM/yyyy',
+                    ).format(litter?.birthDate ?? m.expectedKindlingDate),
+                    highlight: litter == null,
+                    isPast: litter != null,
                   ),
                 ],
               ),

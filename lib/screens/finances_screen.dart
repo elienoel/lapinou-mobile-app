@@ -9,6 +9,7 @@ import '../providers/category_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
+import '../services/validators.dart';
 
 const String _addCategoryValue = '__add_category__';
 
@@ -307,7 +308,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             final title = titleController.text.trim();
                             final amount =
                                 double.tryParse(
@@ -315,7 +316,17 @@ class _FinancesScreenState extends State<FinancesScreen> {
                                 ) ??
                                 0.0;
 
-                            if (title.isNotEmpty && amount > 0) {
+                            final amountError = Validators.amount(amount);
+                            if (amountError != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(amountError),
+                                  backgroundColor: Colors.red.shade700,
+                                ),
+                              );
+                              return;
+                            }
+                            if (title.isNotEmpty) {
                               final tx = FinanceTransaction(
                                 id:
                                     existing?.id ??
@@ -335,13 +346,15 @@ class _FinancesScreenState extends State<FinancesScreen> {
                                         ? null
                                         : notesController.text.trim(),
                               );
+                              final messenger = ScaffoldMessenger.of(context);
+                              final navigator = Navigator.of(ctx);
                               if (isEditing) {
-                                provider.updateFinanceTransaction(tx);
+                                await provider.updateFinanceTransaction(tx);
                               } else {
-                                provider.addFinanceTransaction(tx);
+                                await provider.addFinanceTransaction(tx);
                               }
-                              Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              navigator.pop();
+                              messenger.showSnackBar(
                                 SnackBar(
                                   content: Text(
                                     isEditing
@@ -374,6 +387,63 @@ class _FinancesScreenState extends State<FinancesScreen> {
                           ),
                         ),
                       ),
+                      if (isEditing) ...[
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          key: const ValueKey('tx-delete'),
+                          onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final navigator = Navigator.of(ctx);
+                            final ok = await showDialog<bool>(
+                              context: ctx,
+                              builder:
+                                  (dialogCtx) => AlertDialog(
+                                    title: const Text(
+                                      'Supprimer cette transaction ?',
+                                    ),
+                                    content: Text(
+                                      '« ${existing.title} » sera retiré des totaux. Cette action est définitive.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed:
+                                            () =>
+                                                Navigator.pop(dialogCtx, false),
+                                        child: const Text('Annuler'),
+                                      ),
+                                      FilledButton(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.red.shade700,
+                                        ),
+                                        onPressed:
+                                            () =>
+                                                Navigator.pop(dialogCtx, true),
+                                        child: const Text('Supprimer'),
+                                      ),
+                                    ],
+                                  ),
+                            );
+                            if (ok != true) return;
+                            await provider.deleteFinanceTransaction(
+                              existing.id,
+                            );
+                            navigator.pop();
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Transaction supprimée.'),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: Colors.red.shade700,
+                          ),
+                          label: Text(
+                            'Supprimer',
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

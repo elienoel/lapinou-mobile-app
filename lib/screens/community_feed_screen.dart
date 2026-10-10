@@ -988,7 +988,8 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     } else {
       setState(() => _isSubmitting = false);
       _toast(
-        'Erreur lors de la publication. Vérifiez votre connexion et la taille des fichiers.',
+        provider.lastError ??
+            'Erreur lors de la publication. Vérifiez votre connexion et la taille des fichiers.',
       );
     }
   }

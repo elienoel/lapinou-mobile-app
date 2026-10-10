@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/chat.dart';
 import '../services/api_constants.dart';
+import '../services/validators.dart';
 
 /// Messagerie privée entre éleveurs. Le serveur est interrogé régulièrement
 /// (pastille de non-lus ici, messages d'une discussion dans l'écran ouvert).
@@ -50,9 +51,9 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (_token != null) 'Authorization': 'Bearer $_token',
-      };
+    'Content-Type': 'application/json',
+    if (_token != null) 'Authorization': 'Bearer $_token',
+  };
 
   bool get _hasToken => _token != null && _token!.isNotEmpty;
 
@@ -61,7 +62,10 @@ class ChatProvider extends ChangeNotifier {
   Future<void> fetchUnread() async {
     if (!_hasToken) return;
     try {
-      final r = await _client.get(Uri.parse(ApiConstants.chatUnreadUrl), headers: _headers);
+      final r = await _client.get(
+        Uri.parse(ApiConstants.chatUnreadUrl),
+        headers: _headers,
+      );
       if (r.statusCode == 200) {
         final n = _decode(r)['data']['unread'];
         final value = n is int ? n : 0;
@@ -80,12 +84,19 @@ class ChatProvider extends ChangeNotifier {
     _isLoading = _conversations.isEmpty;
     if (_isLoading) notifyListeners();
     try {
-      final r = await _client.get(Uri.parse(ApiConstants.chatConversationsUrl), headers: _headers);
+      final r = await _client.get(
+        Uri.parse(ApiConstants.chatConversationsUrl),
+        headers: _headers,
+      );
       if (r.statusCode == 200) {
         final list = _decode(r)['data'] as List;
-        _conversations = list
-            .map((c) => ChatConversation.fromJson(Map<String, dynamic>.from(c)))
-            .toList();
+        _conversations =
+            list
+                .map(
+                  (c) =>
+                      ChatConversation.fromJson(Map<String, dynamic>.from(c)),
+                )
+                .toList();
         _unreadTotal = _conversations.fold(0, (sum, c) => sum + c.unread);
       }
     } catch (e) {
@@ -106,7 +117,8 @@ class ChatProvider extends ChangeNotifier {
       );
       if (r.statusCode == 200 || r.statusCode == 201) {
         return ChatConversation.fromJson(
-            Map<String, dynamic>.from(_decode(r)['data']));
+          Map<String, dynamic>.from(_decode(r)['data']),
+        );
       }
     } catch (e) {
       debugPrint('Chat open error: $e');
@@ -130,20 +142,25 @@ class ChatProvider extends ChangeNotifier {
       if (beforeId != null) 'before_id': '$beforeId',
     };
     try {
-      final uri = Uri.parse(ApiConstants.chatMessagesUrl(conversationId))
-          .replace(queryParameters: query);
+      final uri = Uri.parse(
+        ApiConstants.chatMessagesUrl(conversationId),
+      ).replace(queryParameters: query);
       final r = await _client.get(uri, headers: _headers);
       if (r.statusCode != 200) return null;
 
       final data = _decode(r)['data'];
-      final messages = (data['messages'] as List)
-          .map((m) => ChatMessage.fromJson(Map<String, dynamic>.from(m)))
-          .toList();
+      final messages =
+          (data['messages'] as List)
+              .map((m) => ChatMessage.fromJson(Map<String, dynamic>.from(m)))
+              .toList();
 
       // La discussion est lue : sa pastille disparaît tout de suite
       final idx = _conversations.indexWhere((c) => c.id == conversationId);
       if (idx != -1 && _conversations[idx].unread > 0) {
-        _unreadTotal = (_unreadTotal - _conversations[idx].unread).clamp(0, 1 << 30);
+        _unreadTotal = (_unreadTotal - _conversations[idx].unread).clamp(
+          0,
+          1 << 30,
+        );
         _conversations[idx].unread = 0;
         notifyListeners();
       }
@@ -152,7 +169,8 @@ class ChatProvider extends ChangeNotifier {
       return ChatPage(
         messages: messages,
         hasMore: data['has_more'] == true,
-        myReadUpTo: data['my_read_up_to'] is int ? data['my_read_up_to'] as int : null,
+        myReadUpTo:
+            data['my_read_up_to'] is int ? data['my_read_up_to'] as int : null,
       );
     } catch (e) {
       debugPrint('Chat messages error: $e');
@@ -170,16 +188,32 @@ class ChatProvider extends ChangeNotifier {
     int? audioDurationMs,
   }) async {
     if (!_hasToken) throw ChatSendException('Vous n\'êtes pas connecté.');
+    final problem = Validators.chatMessage(
+      text: text,
+      image: image,
+      audio: audio,
+    );
+    if (problem != null) throw ChatSendException(problem);
+    if (audio != null) {
+      final audioProblem = Validators.audio(audio, durationMs: audioDurationMs);
+      if (audioProblem != null) throw ChatSendException(audioProblem);
+    }
     try {
       final request = http.MultipartRequest(
-          'POST', Uri.parse(ApiConstants.chatMessagesUrl(conversationId)));
+        'POST',
+        Uri.parse(ApiConstants.chatMessagesUrl(conversationId)),
+      );
       request.headers['Authorization'] = 'Bearer $_token';
       request.fields['content'] = text;
       if (image != null) {
-        request.files.add(await http.MultipartFile.fromPath('image', image.path));
+        request.files.add(
+          await http.MultipartFile.fromPath('image', image.path),
+        );
       }
       if (audio != null) {
-        request.files.add(await http.MultipartFile.fromPath('audio', audio.path));
+        request.files.add(
+          await http.MultipartFile.fromPath('audio', audio.path),
+        );
         if (audioDurationMs != null) {
           request.fields['audio_duration_ms'] = '$audioDurationMs';
         }
@@ -187,7 +221,9 @@ class ChatProvider extends ChangeNotifier {
       final r = await http.Response.fromStream(await _client.send(request));
 
       if (r.statusCode == 201) {
-        final sent = ChatMessage.fromJson(Map<String, dynamic>.from(_decode(r)['data']));
+        final sent = ChatMessage.fromJson(
+          Map<String, dynamic>.from(_decode(r)['data']),
+        );
         _bumpConversation(conversationId, sent);
         return sent;
       }
@@ -234,8 +270,9 @@ class ChatProvider extends ChangeNotifier {
   Future<List<ChatUser>> searchUsers(String term) async {
     if (!_hasToken) return [];
     try {
-      final uri = Uri.parse(ApiConstants.chatUsersUrl)
-          .replace(queryParameters: {'search': term.trim()});
+      final uri = Uri.parse(
+        ApiConstants.chatUsersUrl,
+      ).replace(queryParameters: {'search': term.trim()});
       final r = await _client.get(uri, headers: _headers);
       if (r.statusCode == 200) {
         return (_decode(r)['data'] as List)

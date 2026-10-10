@@ -52,7 +52,10 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
   @override
   void initState() {
     super.initState();
-    _choices = widget.mating != null ? [widget.mating!] : provider.matingsAwaitingKindling;
+    _choices =
+        widget.mating != null
+            ? [widget.mating!]
+            : provider.matingsAwaitingKindling;
     // Par défaut : le premier accouplement dont la mise bas est déjà possible
     final firstReady = _choices.where((m) => m.canRegisterKindling).firstOrNull;
     _matingId = widget.mating?.id ?? (firstReady ?? _choices.firstOrNull)?.id;
@@ -81,7 +84,8 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
   Future<void> _pickDate() async {
     final m = _mating;
     final today = _dayOnly(DateTime.now());
-    final first = m?.earliestKindlingDate ?? today.subtract(const Duration(days: 120));
+    final first =
+        m?.earliestKindlingDate ?? today.subtract(const Duration(days: 120));
     final picked = await showDatePicker(
       context: context,
       initialDate: _birthDate.isBefore(first) ? first : _birthDate,
@@ -91,11 +95,13 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
     if (picked != null) setState(() => _birthDate = picked);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final m = _mating;
     if (m == null || !m.canRegisterKindling) return;
     final notes = _notes.text.trim();
-    provider.addLitter(
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final error = await provider.addLitter(
       Litter(
         id: 'lit-${DateTime.now().millisecondsSinceEpoch}',
         matingId: m.id,
@@ -107,9 +113,16 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
         notes: notes.isEmpty ? null : notes,
       ),
     );
-    final weaning = _birthDate.add(const Duration(days: Litter.defaultWeaningDays));
-    final messenger = ScaffoldMessenger.of(context);
-    Navigator.pop(context);
+    if (error != null) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red.shade700),
+      );
+      return;
+    }
+    final weaning = _birthDate.add(
+      const Duration(days: Litter.defaultWeaningDays),
+    );
+    navigator.pop();
     messenger.showSnackBar(
       SnackBar(
         content: Text(
@@ -165,34 +178,42 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
                     labelText: 'Accouplement concerné *',
                     prefixIcon: Icon(Icons.favorite, color: AppColors.primary),
                   ),
-                  items: _choices.map((c) {
-                    final f = provider.getRabbitById(c.femaleId);
-                    final mm = provider.getRabbitById(c.maleId);
-                    // Grisé tant que 21 jours ne se sont pas écoulés depuis la saillie
-                    return DropdownMenuItem(
-                      value: c.id,
-                      enabled: c.canRegisterKindling,
-                      child: Text(
-                        '${f?.name ?? 'Femelle'} ♀ x ${mm?.name ?? 'Mâle'} ♂ • saillie du ${DateFormat('dd/MM/yyyy').format(c.matingDate)}'
-                        '${c.canRegisterKindling ? '' : ' (dès le ${DateFormat('dd/MM').format(c.earliestKindlingDate)})'}',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: c.canRegisterKindling ? null : AppColors.textMuted,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setState(() {
-                    _matingId = v;
-                    _clampBirthDate();
-                  }),
+                  items:
+                      _choices.map((c) {
+                        final f = provider.getRabbitById(c.femaleId);
+                        final mm = provider.getRabbitById(c.maleId);
+                        // Grisé tant que 21 jours ne se sont pas écoulés depuis la saillie
+                        return DropdownMenuItem(
+                          value: c.id,
+                          enabled: c.canRegisterKindling,
+                          child: Text(
+                            '${f?.name ?? 'Femelle'} ♀ x ${mm?.name ?? 'Mâle'} ♂ • saillie du ${DateFormat('dd/MM/yyyy').format(c.matingDate)}'
+                            '${c.canRegisterKindling ? '' : ' (dès le ${DateFormat('dd/MM').format(c.earliestKindlingDate)})'}',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color:
+                                  c.canRegisterKindling
+                                      ? null
+                                      : AppColors.textMuted,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  onChanged:
+                      (v) => setState(() {
+                        _matingId = v;
+                        _clampBirthDate();
+                      }),
                 ),
               if (m != null) ...[
                 const SizedBox(height: 8),
                 Text(
                   'Mère : ${mother?.name ?? 'Inconnue'} (${mother?.tagNumber ?? '-'}) • Père : ${father?.name ?? 'Inconnu'} (${father?.tagNumber ?? '-'})\n'
                   'Saillie du ${DateFormat('dd/MM/yyyy').format(m.matingDate)} · mise bas prévue le ${DateFormat('dd/MM/yyyy').format(m.expectedKindlingDate)}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
               if (m != null && !ready)
@@ -214,10 +235,15 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
                 child: InputDecorator(
                   decoration: InputDecoration(
                     labelText: 'Date de la mise bas *',
-                    prefixIcon: const Icon(Icons.event_outlined, color: AppColors.primary, size: 20),
-                    suffixText: daysAgo == 0
-                        ? "Aujourd'hui"
-                        : daysAgo == 1
+                    prefixIcon: const Icon(
+                      Icons.event_outlined,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    suffixText:
+                        daysAgo == 0
+                            ? "Aujourd'hui"
+                            : daysAgo == 1
                             ? 'Hier'
                             : 'Il y a $daysAgo j',
                   ),
@@ -228,7 +254,10 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
               Text(
                 'Sevrage prévu le ${DateFormat('dd/MM/yyyy').format(_birthDate.add(const Duration(days: Litter.defaultWeaningDays)))}',
                 key: const ValueKey('litter-form-weaning-hint'),
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
               Row(
@@ -239,7 +268,11 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Nés vivants *',
-                        prefixIcon: Icon(Icons.favorite, color: AppColors.primary, size: 20),
+                        prefixIcon: Icon(
+                          Icons.favorite,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -250,7 +283,11 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Mort-nés',
-                        prefixIcon: Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 20),
+                        prefixIcon: Icon(
+                          Icons.cancel_outlined,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -293,7 +330,10 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 13, color: AppColors.statusPregnantText),
+        style: const TextStyle(
+          fontSize: 13,
+          color: AppColors.statusPregnantText,
+        ),
       ),
     );
   }

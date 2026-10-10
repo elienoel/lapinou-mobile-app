@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/rabbit_provider.dart';
+import '../services/sync_service.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/author_avatar.dart';
@@ -63,10 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _toast(String message, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.primary,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
     );
   }
 
@@ -195,12 +193,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ---- Compte ----
 
   Future<void> _confirmLogout() async {
+    final pending = context.read<SyncService>().pendingCount;
     final ok = await showDialog<bool>(
       context: context,
       builder:
           (ctx) => AlertDialog(
             title: const Text('Déconnexion'),
-            content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+            content: Text(
+              pending > 0
+                  ? 'Voulez-vous vraiment vous déconnecter ?\n\n'
+                      '$pending modification${pending > 1 ? 's' : ''} ne '
+                      "${pending > 1 ? 'sont' : 'est'} pas encore synchronisée${pending > 1 ? 's' : ''}. "
+                      'Elle${pending > 1 ? 's seront' : ' sera'} envoyée${pending > 1 ? 's' : ''} '
+                      "à la prochaine connexion à ce compte."
+                  : 'Voulez-vous vraiment vous déconnecter ?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -258,10 +265,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             tooltip: 'Paramètres',
-            icon: const Icon(
-              Icons.settings_outlined,
-              color: AppColors.primary,
-            ),
+            icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
             onPressed:
                 () => Navigator.push(
                   context,
@@ -634,7 +638,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: empty ? AppColors.textMuted : AppColors.textPrimary,
+                      color:
+                          empty ? AppColors.textMuted : AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -696,10 +701,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 10),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(
-              Icons.phone_outlined,
-              color: AppColors.primary,
-            ),
+            leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
             title: Text(user.phoneNumber ?? '—'),
             subtitle: const Text('Numéro de connexion (non modifiable)'),
           ),
@@ -717,10 +719,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(
-              Icons.logout_rounded,
-              color: AppColors.primary,
-            ),
+            leading: const Icon(Icons.logout_rounded, color: AppColors.primary),
             title: const Text('Se déconnecter'),
             onTap: _confirmLogout,
           ),

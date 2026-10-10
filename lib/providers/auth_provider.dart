@@ -5,6 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/currency.dart';
 import '../services/api_constants.dart';
+import '../services/local_database.dart';
+import '../services/sync_service.dart';
+import '../services/validators.dart';
 
 class AuthUser {
   final int id;
@@ -36,19 +39,19 @@ class AuthUser {
   });
 
   AuthUser copyWith({String? currency}) => AuthUser(
-        id: id,
-        username: username,
-        phoneNumber: phoneNumber,
-        farmName: farmName,
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        avatar: avatar,
-        location: location,
-        bio: bio,
-        currency: currency ?? this.currency,
-        createdAt: createdAt,
-      );
+    id: id,
+    username: username,
+    phoneNumber: phoneNumber,
+    farmName: farmName,
+    firstName: firstName,
+    lastName: lastName,
+    email: email,
+    avatar: avatar,
+    location: location,
+    bio: bio,
+    currency: currency ?? this.currency,
+    createdAt: createdAt,
+  );
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
@@ -125,8 +128,11 @@ class AuthProvider extends ChangeNotifier {
       final savedUserData = prefs.getString('user_data');
 
       if (savedToken != null && savedUserData != null) {
+        final user = AuthUser.fromJson(jsonDecode(savedUserData));
+        // Base du compte ouverte avant d'exposer la session : sinon l'écran lit la base vide
+        await LocalDatabase.instance.switchToUser('${user.id}');
         _token = savedToken;
-        _user = AuthUser.fromJson(jsonDecode(savedUserData));
+        _user = user;
         notifyListeners();
         refreshProfile();
       }
@@ -137,6 +143,12 @@ class AuthProvider extends ChangeNotifier {
 
   /// 1. Demande d'envoi du code OTP
   Future<bool> requestOtp(String phoneNumber) async {
+    final phoneError = Validators.phone(phoneNumber);
+    if (phoneError != null) {
+      _errorMessage = phoneError;
+      notifyListeners();
+      return false;
+    }
     _isLoading = true;
     _errorMessage = null;
     _pendingPhoneNumber = phoneNumber.trim();
@@ -202,8 +214,11 @@ class AuthProvider extends ChangeNotifier {
 
       if (response.statusCode == 200 && data['success'] == true) {
         final payload = data['data'];
+        final user = AuthUser.fromJson(payload['user']);
+        await LocalDatabase.instance.switchToUser('${user.id}');
+        await SyncService.instance.refreshPendingCount();
         _token = payload['token'];
-        _user = AuthUser.fromJson(payload['user']);
+        _user = user;
 
         // Sauvegarder la session localement
         final prefs = await SharedPreferences.getInstance();
@@ -312,6 +327,8 @@ class AuthProvider extends ChangeNotifier {
   /// Envoie une nouvelle photo de profil. Renvoie null en cas de succès, sinon le message d'erreur.
   Future<String?> updateAvatar(File photo) async {
     if (_token == null) return 'Vous n\'êtes pas connecté.';
+    final photoError = Validators.avatar(photo);
+    if (photoError != null) return photoError;
     try {
       final request = http.MultipartRequest(
         'PATCH',
@@ -397,9 +414,15 @@ class AuthProvider extends ChangeNotifier {
       );
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       if (response.statusCode == 200 && data['success'] == true) return null;
-      return _rollbackCurrency(user, _errorFrom(data, 'Impossible d\'enregistrer la devise.'));
+      return _rollbackCurrency(
+        user,
+        _errorFrom(data, 'Impossible d\'enregistrer la devise.'),
+      );
     } catch (e) {
-      return _rollbackCurrency(user, 'Connexion au serveur impossible. La devise n\'a pas été modifiée.');
+      return _rollbackCurrency(
+        user,
+        'Connexion au serveur impossible. La devise n\'a pas été modifiée.',
+      );
     }
   }
 
@@ -418,6 +441,10 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('user_data');
+    // Les modifications non synchronisées restent dans la base de ce compte et
+    // seront envoyées à sa prochaine connexion.
+    await LocalDatabase.instance.switchToUser(null);
+    await SyncService.instance.refreshPendingCount();
     notifyListeners();
   }
 }

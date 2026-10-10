@@ -38,10 +38,15 @@ class LocalRecord {
   });
 
   factory LocalRecord.fromRow(Map<String, Object?> row) {
+    final localId = row['local_id'] as String;
+    final data = jsonDecode(row['data'] as String) as Map<String, dynamic>;
+    // Un enregistrement créé hors-ligne n'a pas encore d'id serveur dans son JSON :
+    // on expose son id local, comme le fait la liste en mémoire.
+    data.putIfAbsent('id', () => localId);
     return LocalRecord(
-      localId: row['local_id'] as String,
+      localId: localId,
       serverId: row['server_id'] as String?,
-      data: jsonDecode(row['data'] as String) as Map<String, dynamic>,
+      data: data,
       isDirty: (row['is_dirty'] as int) == 1,
       isDeleted: (row['is_deleted'] as int) == 1,
       updatedAt: row['updated_at'] as String,
@@ -50,6 +55,49 @@ class LocalRecord {
 }
 
 /// Une opération en attente de synchronisation avec le serveur.
+/// Une action faite sur l'appareil (création, modification, suppression) et son devenir :
+/// pending (pas encore envoyée), sent, rejected (refusée par le serveur), cancelled.
+class ActionLogEntry {
+  final int id;
+  final int? queueId;
+  final SyncEntity entity;
+  final String localId;
+  final String operation;
+  final String label;
+  final String status;
+  final String? error;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const ActionLogEntry({
+    required this.id,
+    required this.queueId,
+    required this.entity,
+    required this.localId,
+    required this.operation,
+    required this.label,
+    required this.status,
+    required this.error,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory ActionLogEntry.fromRow(Map<String, Object?> row) {
+    return ActionLogEntry(
+      id: row['id'] as int,
+      queueId: row['queue_id'] as int?,
+      entity: SyncEntity.values.firstWhere((e) => e.name == row['entity_type']),
+      localId: row['local_id'] as String,
+      operation: row['operation'] as String,
+      label: row['label'] as String,
+      status: row['status'] as String,
+      error: row['error'] as String?,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      updatedAt: DateTime.parse(row['updated_at'] as String),
+    );
+  }
+}
+
 class SyncQueueItem {
   final int id;
   final SyncEntity entity;
@@ -75,7 +123,8 @@ class SyncQueueItem {
       entity: SyncEntity.values.firstWhere((e) => e.name == row['entity_type']),
       localId: row['local_id'] as String,
       operation: row['operation'] as String,
-      payload: jsonDecode(row['payload_json'] as String) as Map<String, dynamic>,
+      payload:
+          jsonDecode(row['payload_json'] as String) as Map<String, dynamic>,
       clientUuid: row['client_uuid'] as String,
       retryCount: row['retry_count'] as int,
     );
@@ -91,17 +140,33 @@ class LocalDatabase {
   static final LocalDatabase instance = LocalDatabase._();
 
   Database? _db;
+  String? _userId;
 
   Future<Database> get database async {
     _db ??= await _open();
     return _db!;
   }
 
+  /// Ouvre la base propre à [userId] (un fichier par compte, pour ne jamais mélanger
+  /// les données de deux éleveurs). Sans compte, une base en mémoire, jetable.
+  Future<void> switchToUser(String? userId) async {
+    if (userId == _userId && _db != null) return;
+    await _db?.close();
+    _db = null;
+    _userId = userId;
+  }
+
   Future<Database> _open() async {
-    final path = join(await getDatabasesPath(), 'lapinou_offline.db');
+    final path =
+        _userId == null
+            ? inMemoryDatabasePath
+            : join(await getDatabasesPath(), 'lapinou_offline_$_userId.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createActionLog(db);
+      },
       onCreate: (db, version) async {
         for (final entity in SyncEntity.values) {
           await db.execute('''
@@ -131,17 +196,80 @@ class LocalDatabase {
             last_error TEXT
           )
         ''');
+        await _createActionLog(db);
       },
+    );
+  }
+
+  static Future<void> _createActionLog(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS action_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        queue_id INTEGER,
+        entity_type TEXT NOT NULL,
+        local_id TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        label TEXT NOT NULL,
+        status TEXT NOT NULL,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  /// Journal de toutes les actions faites sur l'appareil, de la plus récente à la plus ancienne.
+  Future<List<ActionLogEntry>> actionLog({int limit = 300}) async {
+    final db = await database;
+    final rows = await db.query('action_log', orderBy: 'id DESC', limit: limit);
+    return rows.map(ActionLogEntry.fromRow).toList();
+  }
+
+  Future<int> logAction({
+    required SyncEntity entity,
+    required String localId,
+    required String operation,
+    required String label,
+    required String status,
+    int? queueId,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    return db.insert('action_log', {
+      'queue_id': queueId,
+      'entity_type': entity.name,
+      'local_id': localId,
+      'operation': operation,
+      'label': label,
+      'status': status,
+      'created_at': now,
+      'updated_at': now,
+    });
+  }
+
+  /// Met à jour le statut de toutes les actions liées à une opération de la file.
+  Future<void> setActionStatus(
+    int queueId,
+    String status, {
+    String? error,
+  }) async {
+    final db = await database;
+    await db.update(
+      'action_log',
+      {
+        'status': status,
+        'error': error,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'queue_id = ?',
+      whereArgs: [queueId],
     );
   }
 
   /// Toutes les lignes non supprimées d'une entité (ordre libre, tri fait en mémoire).
   Future<List<LocalRecord>> getAll(SyncEntity entity) async {
     final db = await database;
-    final rows = await db.query(
-      entity.table,
-      where: 'is_deleted = 0',
-    );
+    final rows = await db.query(entity.table, where: 'is_deleted = 0');
     return rows.map(LocalRecord.fromRow).toList();
   }
 
@@ -153,29 +281,28 @@ class LocalDatabase {
     List<Map<String, dynamic>> serverRecords,
   ) async {
     final db = await database;
-    final dirtyLocalIds = (await db.query(
-      entity.table,
-      columns: ['local_id'],
-      where: 'is_dirty = 1',
-    )).map((r) => r['local_id'] as String).toSet();
+    final dirtyLocalIds =
+        (await db.query(
+          entity.table,
+          columns: ['local_id'],
+          where: 'is_dirty = 1',
+        )).map((r) => r['local_id'] as String).toSet();
 
     await db.transaction((txn) async {
       final batch = txn.batch();
       for (final record in serverRecords) {
         final serverId = record['id'].toString();
         if (dirtyLocalIds.contains(serverId)) continue;
-        batch.insert(
-          entity.table,
-          {
-            'local_id': serverId,
-            'server_id': serverId,
-            'data': jsonEncode(record),
-            'is_dirty': 0,
-            'is_deleted': 0,
-            'updated_at': (record['updated_at'] ?? DateTime.now().toIso8601String()).toString(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        batch.insert(entity.table, {
+          'local_id': serverId,
+          'server_id': serverId,
+          'data': jsonEncode(record),
+          'is_dirty': 0,
+          'is_deleted': 0,
+          'updated_at':
+              (record['updated_at'] ?? DateTime.now().toIso8601String())
+                  .toString(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);
     });
@@ -191,25 +318,25 @@ class LocalDatabase {
     String? serverId,
   }) async {
     final db = await database;
-    await db.insert(
-      entity.table,
-      {
-        'local_id': localId,
-        'server_id': serverId,
-        'data': jsonEncode(data),
-        'is_dirty': isDirty ? 1 : 0,
-        'is_deleted': 0,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert(entity.table, {
+      'local_id': localId,
+      'server_id': serverId,
+      'data': jsonEncode(data),
+      'is_dirty': isDirty ? 1 : 0,
+      'is_deleted': 0,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> markDeletedLocal(SyncEntity entity, String localId) async {
     final db = await database;
     await db.update(
       entity.table,
-      {'is_deleted': 1, 'is_dirty': 1, 'updated_at': DateTime.now().toIso8601String()},
+      {
+        'is_deleted': 1,
+        'is_dirty': 1,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
       where: 'local_id = ?',
       whereArgs: [localId],
     );
@@ -230,23 +357,28 @@ class LocalDatabase {
   ) async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.delete(entity.table, where: 'local_id = ?', whereArgs: [localId]);
-      await txn.insert(
+      await txn.delete(
         entity.table,
-        {
-          'local_id': serverId,
-          'server_id': serverId,
-          'data': jsonEncode(serverData),
-          'is_dirty': 0,
-          'is_deleted': 0,
-          'updated_at': (serverData['updated_at'] ?? DateTime.now().toIso8601String()).toString(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        where: 'local_id = ?',
+        whereArgs: [localId],
       );
+      await txn.insert(entity.table, {
+        'local_id': serverId,
+        'server_id': serverId,
+        'data': jsonEncode(serverData),
+        'is_dirty': 0,
+        'is_deleted': 0,
+        'updated_at':
+            (serverData['updated_at'] ?? DateTime.now().toIso8601String())
+                .toString(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
   }
 
-  Future<void> deleteConfirmedByServer(SyncEntity entity, String serverId) async {
+  Future<void> deleteConfirmedByServer(
+    SyncEntity entity,
+    String serverId,
+  ) async {
     final db = await database;
     await db.delete(
       entity.table,
@@ -293,7 +425,7 @@ class LocalDatabase {
     }
   }
 
-  Future<void> enqueue({
+  Future<int> enqueue({
     required SyncEntity entity,
     required String localId,
     required String operation,
@@ -301,7 +433,7 @@ class LocalDatabase {
     required String clientUuid,
   }) async {
     final db = await database;
-    await db.insert('sync_queue', {
+    return db.insert('sync_queue', {
       'entity_type': entity.name,
       'local_id': localId,
       'operation': operation,

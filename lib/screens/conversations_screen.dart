@@ -26,8 +26,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     super.initState();
     final chat = context.read<ChatProvider>();
     // Après la construction : le chargement notifie les écouteurs (pas permis pendant un build)
-    WidgetsBinding.instance.addPostFrameCallback((_) => chat.fetchConversations());
-    _timer = Timer.periodic(const Duration(seconds: 8), (_) => chat.fetchConversations());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => chat.fetchConversations(),
+    );
+    _timer = Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => chat.fetchConversations(),
+    );
   }
 
   @override
@@ -81,19 +86,25 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: chat.fetchConversations,
-        child: chat.isLoading && list.isEmpty
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.primary))
-            : list.isEmpty
+        child:
+            chat.isLoading && list.isEmpty
+                ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+                : list.isEmpty
                 ? _buildEmpty()
                 : ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 90),
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 1, indent: 74, color: Color(0xFFEDEFED)),
-                    itemBuilder: (context, i) => _tile(list[i], me),
-                  ),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 90),
+                  itemCount: list.length,
+                  separatorBuilder:
+                      (_, __) => const Divider(
+                        height: 1,
+                        indent: 74,
+                        color: Color(0xFFEDEFED),
+                      ),
+                  itemBuilder: (context, i) => _tile(list[i], me),
+                ),
       ),
     );
   }
@@ -154,7 +165,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: unread ? FontWeight.w800 : FontWeight.w700,
+                            fontWeight:
+                                unread ? FontWeight.w800 : FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),
                         ),
@@ -164,10 +176,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           chatListTime(last.createdAt),
                           style: TextStyle(
                             fontSize: 11.5,
-                            fontWeight: unread ? FontWeight.w700 : FontWeight.normal,
-                            color: unread
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
+                            fontWeight:
+                                unread ? FontWeight.w700 : FontWeight.normal,
+                            color:
+                                unread
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
                           ),
                         ),
                     ],
@@ -182,17 +196,22 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: unread ? FontWeight.w600 : FontWeight.normal,
-                            color: unread
-                                ? AppColors.textPrimary
-                                : AppColors.textSecondary,
+                            fontWeight:
+                                unread ? FontWeight.w600 : FontWeight.normal,
+                            color:
+                                unread
+                                    ? AppColors.textPrimary
+                                    : AppColors.textSecondary,
                           ),
                         ),
                       ),
                       if (unread)
                         Container(
                           margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             borderRadius: BorderRadius.circular(12),

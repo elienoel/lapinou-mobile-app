@@ -19,7 +19,9 @@ class CurrencySettingsScreen extends StatelessWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(error ?? 'Devise : ${currency.name} (${currency.symbol})'),
+          content: Text(
+            error ?? 'Devise : ${currency.name} (${currency.symbol})',
+          ),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -64,11 +66,15 @@ class CurrencySettingsScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.visibility_outlined,
-                      color: AppColors.primary),
+                  const Icon(
+                    Icons.visibility_outlined,
+                    color: AppColors.primary,
+                  ),
                   const SizedBox(width: 10),
-                  const Text('Aperçu : ',
-                      style: TextStyle(color: AppColors.textSecondary)),
+                  const Text(
+                    'Aperçu : ',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                   Expanded(
                     child: Text(
                       current.format(45000, showSign: true),
@@ -93,9 +99,17 @@ class CurrencySettingsScreen extends StatelessWidget {
               child: Column(
                 children: [
                   for (int i = 0; i < kCurrencies.length; i++) ...[
-                    _tile(context, kCurrencies[i], selected: kCurrencies[i].code == current.code),
+                    _tile(
+                      context,
+                      kCurrencies[i],
+                      selected: kCurrencies[i].code == current.code,
+                    ),
                     if (i < kCurrencies.length - 1)
-                      const Divider(height: 1, indent: 72, color: Color(0xFFEDEFED)),
+                      const Divider(
+                        height: 1,
+                        indent: 72,
+                        color: Color(0xFFEDEFED),
+                      ),
                   ],
                 ],
               ),
@@ -135,9 +149,13 @@ class CurrencySettingsScreen extends StatelessWidget {
         ),
       ),
       subtitle: Text(c.code),
-      trailing: selected
-          ? const Icon(Icons.check_circle, color: AppColors.primary)
-          : const Icon(Icons.radio_button_unchecked, color: AppColors.textMuted),
+      trailing:
+          selected
+              ? const Icon(Icons.check_circle, color: AppColors.primary)
+              : const Icon(
+                Icons.radio_button_unchecked,
+                color: AppColors.textMuted,
+              ),
     );
   }
 }

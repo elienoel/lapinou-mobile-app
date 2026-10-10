@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:intl/intl.dart';
+
+import '../services/local_database.dart';
 import '../services/sync_service.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
@@ -91,7 +94,11 @@ class SyncSettingsScreen extends StatelessWidget {
                                   strokeWidth: 2.4,
                                   color: statusColor,
                                 )
-                                : Icon(statusIcon, color: statusColor, size: 22),
+                                : Icon(
+                                  statusIcon,
+                                  color: statusColor,
+                                  size: 22,
+                                ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -144,7 +151,9 @@ class SyncSettingsScreen extends StatelessWidget {
                       onPressed: syncing ? null : () => sync.syncNow(),
                       icon: const Icon(Icons.sync, size: 18),
                       label: Text(
-                        syncing ? 'Synchronisation…' : 'Synchroniser maintenant',
+                        syncing
+                            ? 'Synchronisation…'
+                            : 'Synchroniser maintenant',
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -154,9 +163,244 @@ class SyncSettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            _actionsCard(
+              title: 'À synchroniser',
+              subtitle:
+                  sync.pendingActions.isEmpty
+                      ? 'Rien en attente : tout est envoyé au serveur.'
+                      : 'Ces actions ne sont pas encore envoyées. Elles partiront dès la connexion.',
+              entries: sync.pendingActions,
+              highlight: true,
+              emptyText: 'Aucune action en attente.',
+            ),
+            const SizedBox(height: 16),
+            _actionsCard(
+              title: 'Historique',
+              subtitle:
+                  'Toutes les actions faites sur cet appareil, les plus récentes d\'abord.',
+              entries: sync.history,
+              highlight: false,
+              emptyText: 'Aucune action enregistrée.',
+            ),
+            if (sync.rejected.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Modifications refusées par le serveur',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Ces éléments ne sont pas enregistrés dans votre élevage en ligne. '
+                      'Corrigez-les puis relancez l’envoi.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    for (final r in sync.rejected) ...[
+                      const Divider(height: 20),
+                      Text(
+                        '${r.entityLabel} : ${r.name}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        r.error,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.red.shade800,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('sync-retry-rejected'),
+                        onPressed: syncing ? null : () => sync.retryRejected(),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Relancer l’envoi'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+
+  Widget _actionsCard({
+    required String title,
+    required String subtitle,
+    required List<ActionLogEntry> entries,
+    required bool highlight,
+    required String emptyText,
+  }) {
+    final accent = highlight ? Colors.amber.shade900 : AppColors.textPrimary;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color:
+            highlight && entries.isNotEmpty
+                ? Colors.amber.shade50
+                : Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color:
+              highlight && entries.isNotEmpty
+                  ? Colors.amber.shade400
+                  : AppColors.cardBorder,
+          width: highlight && entries.isNotEmpty ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                  ),
+                ),
+              ),
+              if (highlight && entries.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade200,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${entries.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (entries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                emptyText,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            )
+          else
+            for (final a in entries) ...[
+              const Divider(height: 14),
+              _actionRow(a),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _actionRow(ActionLogEntry a) {
+    final (label, color) = switch (a.status) {
+      'pending' => ('En attente', Colors.amber.shade900),
+      'sent' => ('Envoyée', AppColors.primary),
+      'rejected' => ('Refusée', Colors.red.shade700),
+      _ => ('Annulée', AppColors.textSecondary),
+    };
+    final op = switch (a.operation) {
+      'create' => 'Création',
+      'update' => 'Modification',
+      _ => 'Suppression',
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${a.label} · ${_entityLabel(a.entity)}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(
+                '$op · ${DateFormat('dd/MM/yyyy HH:mm').format(a.updatedAt)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              if (a.error != null)
+                Text(
+                  a.error!,
+                  style: TextStyle(fontSize: 12, color: Colors.red.shade800),
+                ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withAlpha(25),
+            border: Border.all(color: color),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _entityLabel(SyncEntity e) => switch (e) {
+    SyncEntity.rabbit => 'Lapin',
+    SyncEntity.cage => 'Cage',
+    SyncEntity.mating => 'Accouplement',
+    SyncEntity.litter => 'Mise bas',
+    SyncEntity.careTreatment => 'Type de soin',
+    SyncEntity.careRecord => 'Soin',
+    SyncEntity.careEvent => 'Suivi',
+    SyncEntity.finance => 'Transaction',
+  };
 }

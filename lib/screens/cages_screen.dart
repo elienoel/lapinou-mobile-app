@@ -13,10 +13,7 @@ void _snack(BuildContext context, String message, {bool error = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.primary,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
     );
 }
 
@@ -674,8 +671,7 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
                                   final moving = r.cageId != null;
                                   return ListTile(
                                     leading: CircleAvatar(
-                                      backgroundColor:
-                                          Colors.white,
+                                      backgroundColor: Colors.white,
                                       child: Text(
                                         r.shortGenderSymbol,
                                         style: TextStyle(

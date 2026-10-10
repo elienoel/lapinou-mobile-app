@@ -62,7 +62,11 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ),
                   ),
-                  const Divider(height: 1, indent: 56, color: Color(0xFFEDEFED)),
+                  const Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Color(0xFFEDEFED),
+                  ),
                   _tile(
                     context,
                     key: const ValueKey('settings-categories'),
@@ -77,7 +81,11 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ),
                   ),
-                  const Divider(height: 1, indent: 56, color: Color(0xFFEDEFED)),
+                  const Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Color(0xFFEDEFED),
+                  ),
                   _tile(
                     context,
                     key: const ValueKey('settings-sync'),

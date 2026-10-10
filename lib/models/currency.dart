@@ -32,16 +32,27 @@ class AppCurrency {
   }
 }
 
-const AppCurrency kDefaultCurrency =
-    AppCurrency(code: 'EUR', symbol: '€', name: 'Euro');
+const AppCurrency kDefaultCurrency = AppCurrency(
+  code: 'EUR',
+  symbol: '€',
+  name: 'Euro',
+);
 
 /// Liste identique à celle acceptée par le serveur.
 const List<AppCurrency> kCurrencies = [
   kDefaultCurrency,
   AppCurrency(
-      code: 'XOF', symbol: 'FCFA', name: 'Franc CFA (BCEAO)', decimals: 0),
+    code: 'XOF',
+    symbol: 'FCFA',
+    name: 'Franc CFA (BCEAO)',
+    decimals: 0,
+  ),
   AppCurrency(
-      code: 'XAF', symbol: 'FCFA', name: 'Franc CFA (BEAC)', decimals: 0),
+    code: 'XAF',
+    symbol: 'FCFA',
+    name: 'Franc CFA (BEAC)',
+    decimals: 0,
+  ),
   AppCurrency(code: 'USD', symbol: r'$', name: 'Dollar américain'),
   AppCurrency(code: 'GBP', symbol: '£', name: 'Livre sterling'),
   AppCurrency(code: 'CHF', symbol: 'CHF', name: 'Franc suisse'),

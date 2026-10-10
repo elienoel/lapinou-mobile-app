@@ -82,10 +82,17 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.primarySoft,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primarySoftBorder, width: 2),
+                      border: Border.all(
+                        color: AppColors.primarySoftBorder,
+                        width: 2,
+                      ),
                     ),
                     child: const Center(
-                      child: AppIcon(AppIcons.rabbit, size: 54, color: AppColors.primary),
+                      child: AppIcon(
+                        AppIcons.rabbit,
+                        size: 54,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ),

@@ -316,7 +316,10 @@ class _CareScreenState extends State<CareScreen>
             const SizedBox(height: 8),
             Text(
               care.purpose,
-              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
           const SizedBox(height: 10),
@@ -486,7 +489,10 @@ class _CareScreenState extends State<CareScreen>
                         },
                         itemBuilder:
                             (_) => const [
-                              PopupMenuItem(value: 'edit', child: Text('Modifier')),
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Text('Modifier'),
+                              ),
                               PopupMenuItem(
                                 value: 'delete',
                                 child: Text('Supprimer'),
@@ -566,7 +572,11 @@ class _CareScreenState extends State<CareScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const AppIcon(AppIcons.rabbit, size: 14, color: AppColors.primary),
+                const AppIcon(
+                  AppIcons.rabbit,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 5),
                 Text(
                   r.name,

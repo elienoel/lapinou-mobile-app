@@ -142,7 +142,9 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
               child: Icon(
                 _failed
                     ? Icons.error_outline
-                    : (_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                    : (_playing
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded),
                 color: widget.isMine ? AppColors.primary : Colors.white,
                 size: 26,
               ),
@@ -156,8 +158,12 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 12,
+                    ),
                     activeTrackColor: fg,
                     inactiveTrackColor: soft,
                     thumbColor: fg,
@@ -166,11 +172,12 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
                     height: 22,
                     child: Slider(
                       value: progress,
-                      onChanged: total > 0 && _playback != null
-                          ? (v) => _playback!.seek(
+                      onChanged:
+                          total > 0 && _playback != null
+                              ? (v) => _playback!.seek(
                                 Duration(milliseconds: (v * total).round()),
                               )
-                          : null,
+                              : null,
                     ),
                   ),
                 ),
@@ -191,7 +198,9 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
                         onTap: _cycleSpeed,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: soft,
                             borderRadius: BorderRadius.circular(8),

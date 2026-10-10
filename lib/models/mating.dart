@@ -59,14 +59,16 @@ class Mating {
   static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// Jours écoulés depuis la saillie (jours calendaires)
-  int get daysSinceMating => _day(DateTime.now()).difference(_day(matingDate)).inDays;
+  int get daysSinceMating =>
+      _day(DateTime.now()).difference(_day(matingDate)).inDays;
 
   /// Première date à laquelle la mise bas peut être enregistrée (saillie + 21 jours)
   DateTime get earliestKindlingDate =>
       _day(matingDate).add(const Duration(days: minGestationDays));
 
   /// La mise bas ne peut être enregistrée qu'à partir de 21 jours après la saillie
-  bool get canRegisterKindling => isActive && daysSinceMating >= minGestationDays;
+  bool get canRegisterKindling =>
+      isActive && daysSinceMating >= minGestationDays;
 
   /// Date estimée de palpation (12 jours après le saut)
   DateTime get palpationDate => matingDate.add(const Duration(days: 12));
@@ -136,9 +138,10 @@ class Mating {
       matingDate: parsedMatingDate,
       status: s,
       notes: json['notes'],
-      palpationDoneAt: json['palpation_done_at'] != null
-          ? DateTime.tryParse(json['palpation_done_at'].toString())
-          : null,
+      palpationDoneAt:
+          json['palpation_done_at'] != null
+              ? DateTime.tryParse(json['palpation_done_at'].toString())
+              : null,
     );
   }
 

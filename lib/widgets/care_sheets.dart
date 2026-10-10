@@ -107,7 +107,9 @@ class _CareTreatmentSheetState extends State<CareTreatmentSheet> {
     }
     final raw = _days.text.trim();
     if (raw.isNotEmpty && (_renewalDays == null || _renewalDays! < 1)) {
-      setState(() => _error = 'La durée doit être un nombre de jours (1 ou plus).');
+      setState(
+        () => _error = 'La durée doit être un nombre de jours (1 ou plus).',
+      );
       return;
     }
     setState(() {
@@ -226,7 +228,8 @@ class _CareTreatmentSheetState extends State<CareTreatmentSheet> {
                               : AppColors.textPrimary,
                     ),
                     onSelected:
-                        (_) => setState(() => _days.text = days?.toString() ?? ''),
+                        (_) =>
+                            setState(() => _days.text = days?.toString() ?? ''),
                   ),
               ],
             ),
@@ -238,7 +241,8 @@ class _CareTreatmentSheetState extends State<CareTreatmentSheet> {
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 labelText: 'Jours avant le prochain soin',
-                helperText: 'Laissez vide pour un soin ponctuel (aucun rappel).',
+                helperText:
+                    'Laissez vide pour un soin ponctuel (aucun rappel).',
               ),
             ),
             const SizedBox(height: 12),
@@ -278,7 +282,9 @@ class _CareTreatmentSheetState extends State<CareTreatmentSheet> {
                             color: Colors.white,
                           ),
                         )
-                        : Text(isEdit ? 'Enregistrer' : 'Créer le type de soin'),
+                        : Text(
+                          isEdit ? 'Enregistrer' : 'Créer le type de soin',
+                        ),
               ),
             ),
           ],
@@ -327,7 +333,10 @@ class _CareRecordSheetState extends State<CareRecordSheet> {
     _date = r?.date ?? DateTime.now();
     _treatmentId = r?.treatmentId ?? widget.initialTreatmentId;
     _rabbitIds = {
-      if (r != null) ...r.rabbits.map((x) => x.id) else ...widget.initialRabbitIds,
+      if (r != null)
+        ...r.rabbits.map((x) => x.id)
+      else
+        ...widget.initialRabbitIds,
     };
   }
 
@@ -423,7 +432,11 @@ class _CareRecordSheetState extends State<CareRecordSheet> {
     final nextDue =
         treatment?.renewalDays == null
             ? null
-            : DateTime(_date.year, _date.month, _date.day + treatment!.renewalDays!);
+            : DateTime(
+              _date.year,
+              _date.month,
+              _date.day + treatment!.renewalDays!,
+            );
 
     return Padding(
       padding: EdgeInsets.only(
@@ -485,7 +498,10 @@ class _CareRecordSheetState extends State<CareRecordSheet> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(t.name, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              t.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),

@@ -57,6 +57,7 @@ class Rabbit {
   final String tagNumber;
   final RabbitGender gender;
   final String breed;
+  final String? breedId;
   final DateTime birthDate;
   final String color;
   final String cageNumber;
@@ -80,6 +81,7 @@ class Rabbit {
     required this.tagNumber,
     required this.gender,
     required this.breed,
+    this.breedId,
     required this.birthDate,
     required this.color,
     required this.cageNumber,
@@ -155,6 +157,8 @@ class Rabbit {
     String? tagNumber,
     RabbitGender? gender,
     String? breed,
+    String? breedId,
+    bool clearBreed = false,
     DateTime? birthDate,
     String? color,
     String? cageNumber,
@@ -177,6 +181,7 @@ class Rabbit {
       tagNumber: tagNumber ?? this.tagNumber,
       gender: gender ?? this.gender,
       breed: breed ?? this.breed,
+      breedId: clearBreed ? null : (breedId ?? this.breedId),
       birthDate: birthDate ?? this.birthDate,
       color: color ?? this.color,
       cageNumber: cageNumber ?? this.cageNumber,
@@ -248,6 +253,10 @@ class Rabbit {
       breed:
           json['breed_name'] ??
           (json['breed'] is Map ? json['breed']['name'] : 'Fauve de Bourgogne'),
+      breedId:
+          json['breed'] is Map
+              ? json['breed']['id']?.toString()
+              : json['breed']?.toString(),
       birthDate: parsedBirthDate,
       color: json['color'] ?? 'Standard',
       cageNumber: json['cage_number'] ?? 'Non assigné',
@@ -273,6 +282,7 @@ class Rabbit {
       'gender': gender == RabbitGender.male ? 'M' : 'F',
       'birth_date':
           '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',
+      'breed': breedId == null ? null : (int.tryParse(breedId!) ?? breedId),
       'color': color,
       'cage_number': cageNumber,
       // Repli sur l'id local (non numérique) si la cage/le parent n'a pas encore

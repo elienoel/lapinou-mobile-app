@@ -59,7 +59,8 @@ class CategoryProvider extends ChangeNotifier {
 
   Future<void> _persist(TransactionType type) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = type == TransactionType.income ? _prefsKeyIncome : _prefsKeyExpense;
+    final key =
+        type == TransactionType.income ? _prefsKeyIncome : _prefsKeyExpense;
     final list = type == TransactionType.income ? _income : _expense;
     await prefs.setString(key, jsonEncode(list));
   }

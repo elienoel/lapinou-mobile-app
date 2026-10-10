@@ -17,13 +17,16 @@ class ChatIconButton extends StatelessWidget {
         isLabelVisible: unread > 0,
         label: Text(unread > 99 ? '99+' : '$unread'),
         backgroundColor: AppColors.primary,
-        child: const Icon(Icons.chat_bubble_outline_rounded,
-            color: AppColors.primary),
+        child: const Icon(
+          Icons.chat_bubble_outline_rounded,
+          color: AppColors.primary,
+        ),
       ),
-      onPressed: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ConversationsScreen()),
-      ),
+      onPressed:
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ConversationsScreen()),
+          ),
     );
   }
 }

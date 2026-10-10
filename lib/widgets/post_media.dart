@@ -309,10 +309,7 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
   Widget _placeholder(Widget child) {
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: Container(
-        color: AppColors.primary,
-        child: Center(child: child),
-      ),
+      child: Container(color: AppColors.primary, child: Center(child: child)),
     );
   }
 }

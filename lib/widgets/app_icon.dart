@@ -61,7 +61,12 @@ class CareCategoryIcon extends StatelessWidget {
   final double size;
   final Color? color;
 
-  const CareCategoryIcon(this.category, {super.key, this.size = 24, this.color});
+  const CareCategoryIcon(
+    this.category, {
+    super.key,
+    this.size = 24,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {

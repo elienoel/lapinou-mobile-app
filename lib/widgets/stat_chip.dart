@@ -28,8 +28,7 @@ class StatChip extends StatelessWidget {
           color: isHighlighted ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(
-            color:
-                isHighlighted ? AppColors.primary : AppColors.cardBorder,
+            color: isHighlighted ? AppColors.primary : AppColors.cardBorder,
             width: 1,
           ),
           boxShadow: [
