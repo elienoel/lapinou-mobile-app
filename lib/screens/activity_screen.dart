@@ -32,7 +32,7 @@ class ActivityScreen extends StatelessWidget {
                       child: Padding(
                         padding: EdgeInsets.all(24),
                         child: Text(
-                          'Aucune action en attente. Tout est à jour ! 🎉',
+                          'Aucune action en attente. Tout est à jour !',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,

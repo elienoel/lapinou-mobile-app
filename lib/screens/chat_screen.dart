@@ -537,7 +537,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('👋', style: TextStyle(fontSize: 42)),
+            const Icon(Icons.waving_hand_outlined, size: 42, color: AppColors.textSecondary),
             const SizedBox(height: 8),
             Text(
               'Dites bonjour à ${_other.name}',

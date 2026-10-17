@@ -390,7 +390,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '🏡 ${user.farmName}',
+                user.farmName!,
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -402,7 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '📍 ${user.location}',
+                user.location!,
                 style: const TextStyle(
                   fontSize: 12.5,
                   color: AppColors.textSecondary,
@@ -674,10 +674,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          row(Icons.person_outline, 'Prénom', user.firstName),
-          row(Icons.badge_outlined, 'Nom', user.lastName),
-          row(Icons.home_work_outlined, "Nom de l'élevage", user.farmName),
-          row(Icons.location_on_outlined, 'Localisation', user.location),
+
+          Row(
+            children: [
+              Expanded(child: row(Icons.person_outline, 'Prénom', user.firstName)),
+              Expanded(child: row(Icons.badge_outlined, 'Nom', user.lastName)),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: row(
+                  Icons.home_work_outlined,
+                  "Nom de l'élevage",
+                  user.farmName,
+                ),
+              ),
+              Expanded(
+                child: row(
+                  Icons.location_on_outlined,
+                  'Localisation',
+                  user.location,
+                ),
+              ),
+            ],
+          ),
+
           row(Icons.mail_outline, 'Email', user.email),
           row(Icons.notes_outlined, 'À propos de vous', user.bio),
         ],

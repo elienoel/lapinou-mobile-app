@@ -211,7 +211,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('💬', style: TextStyle(fontSize: 36)),
+          Icon(Icons.chat_bubble_outline, size: 36, color: AppColors.textSecondary),
           SizedBox(height: 8),
           Text(
             'Aucun commentaire pour le moment',

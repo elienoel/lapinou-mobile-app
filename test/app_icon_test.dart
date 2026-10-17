@@ -58,7 +58,7 @@ void main() {
     expect(_filterOf(tester), const ColorFilter.mode(Colors.blue, BlendMode.srcIn));
   });
 
-  testWidgets('vaccines show the syringe, other care families keep their emoji', (
+  testWidgets('vaccines show the syringe, other care families use a Material icon', (
     tester,
   ) async {
     await _pump(tester, const CareCategoryIcon(CareCategory.vaccine));
@@ -68,6 +68,6 @@ void main() {
     await _pump(tester, const CareCategoryIcon(CareCategory.vitamin));
     await tester.pumpAndSettle();
     expect(find.byType(SvgPicture), findsNothing);
-    expect(find.text(CareCategory.vitamin.emoji), findsOneWidget);
+    expect(find.byIcon(Icons.eco_outlined), findsOneWidget);
   });
 }

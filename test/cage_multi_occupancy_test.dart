@@ -6,8 +6,12 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lapinou/services/connectivity_service.dart';
+import 'package:lapinou/services/sync_service.dart';
+import 'package:lapinou/services/local_database.dart';
 import 'package:lapinou/models/cage.dart';
 import 'package:lapinou/models/rabbit.dart';
+import 'package:lapinou/widgets/app_icon.dart';
 import 'package:lapinou/providers/auth_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
 import 'package:lapinou/screens/add_rabbit_screen.dart';
@@ -45,8 +49,17 @@ Cage _cage(Map<int, List<Map<String, dynamic>>> rabbits, {bool legacyFormat = fa
   });
 }
 
+
+/// Les écritures sont d'abord locales (file de synchronisation) : on relit la dernière
+/// opération mise en file plutôt qu'une requête HTTP immédiate.
+Future<Map<String, dynamic>> _lastQueued(SyncEntity entity, String operation) async {
+  final queue = await LocalDatabase.instance.pendingQueue();
+  return queue.lastWhere((q) => q.entity == entity && q.operation == operation).payload;
+}
+
 void main() {
   setUpAll(() async {
+    ConnectivityService.instance.debugOnlineOverride = false; // pas de réseau : écritures locales
     await initializeDateFormatting('fr_FR', null);
   });
 
@@ -92,7 +105,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: SizedBox(width: 180, child: CageDiagram(cage: cage, compact: true))),
       ));
-      expect(find.text('🐰'), findsNWidgets(2)); // deux loges occupées
+      expect(find.byType(AppIcon), findsNWidgets(2)); // deux loges occupées
       expect(find.text('×3'), findsOneWidget);
       expect(find.text('×1'), findsNothing);
     });
@@ -170,9 +183,9 @@ void main() {
         await tester.pumpAndSettle();
       }, api);
 
-      final patch = requests.firstWhere((r) => r.startsWith('PATCH'));
-      expect(patch, contains('/rabbits/p-m-1/'));
-      expect(jsonDecode(patch.substring(patch.indexOf('{'))), {'cage': 1, 'compartment_number': 1});
+      final patch = await _lastQueued(SyncEntity.rabbit, 'update');
+      expect(patch, containsPair('cage', 1));
+      expect(patch, containsPair('compartment_number', 1));
       expect(find.textContaining('Flash placé'), findsOneWidget);
     });
 
@@ -200,7 +213,13 @@ void main() {
     });
 
     testWidgets('each rabbit of a shared compartment can be removed on its own', (tester) async {
-      final cage = _cage({1: [_rabbit(10, 'Bella'), _rabbit(11, 'Flash', gender: 'M')]});
+      // Lapins du jeu de test du provider : le retrait passe par la fiche locale du lapin
+      final cage = _cage({
+        1: [
+          {..._rabbit(10, 'Bella'), 'id': 'p-f-1'},
+          {..._rabbit(11, 'Flash', gender: 'M'), 'id': 'p-m-1'},
+        ],
+      });
       await openDetail(tester, cage);
 
       await http.runWithClient(() async {
@@ -208,20 +227,19 @@ void main() {
         await tester.tap(find.text('1'));
         await tester.pumpAndSettle();
         expect(find.text('2 lapins dans cette loge'), findsOneWidget);
-        expect(find.byKey(const ValueKey('occupant-10')), findsOneWidget);
-        expect(find.byKey(const ValueKey('occupant-11')), findsOneWidget);
+        expect(find.byKey(const ValueKey('occupant-p-f-1')), findsOneWidget);
+        expect(find.byKey(const ValueKey('occupant-p-m-1')), findsOneWidget);
 
         requests.clear();
         await tester.tap(find.descendant(
-          of: find.byKey(const ValueKey('occupant-11')),
+          of: find.byKey(const ValueKey('occupant-p-m-1')),
           matching: find.byTooltip('Retirer de la loge'),
         ));
         await tester.pumpAndSettle();
       }, api);
 
-      final patch = requests.firstWhere((r) => r.startsWith('PATCH'));
-      expect(patch, contains('/rabbits/11/'));
-      expect(jsonDecode(patch.substring(patch.indexOf('{')))['cage'], isNull);
+      final patch = await _lastQueued(SyncEntity.rabbit, 'update');
+      expect(patch['cage'], isNull);
       expect(find.textContaining('Flash retiré'), findsOneWidget);
     });
 

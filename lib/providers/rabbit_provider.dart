@@ -907,7 +907,7 @@ class RabbitProvider extends ChangeNotifier {
         }),
       );
       if (response.statusCode == 200) {
-        // Portées, lapins (nouvelles fiches, mère) et cages (🍼) ont changé
+        // Portées, lapins (nouvelles fiches, mère) et cages ont changé
         await Future.wait([
           fetchLitters(token: t),
           fetchRabbits(token: t),
@@ -1130,7 +1130,9 @@ class RabbitProvider extends ChangeNotifier {
     String? token,
   }) async {
     final today = DateTime.now();
-    if (date.isAfter(DateTime(today.year, today.month, today.day))) {
+    if (DateTime(date.year, date.month, date.day).isAfter(
+      DateTime(today.year, today.month, today.day),
+    )) {
       return 'Un soin effectué ne peut pas être daté dans le futur.';
     }
     if (rabbitIds.isEmpty) return 'Sélectionnez au moins un lapin soigné.';

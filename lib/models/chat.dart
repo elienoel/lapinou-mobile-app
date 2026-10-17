@@ -115,8 +115,8 @@ class ChatPreview {
 
   String get text {
     if (content.trim().isNotEmpty) return content;
-    if (hasAudio) return '🎤 Message vocal';
-    return '📷 Photo';
+    if (hasAudio) return 'Message vocal';
+    return 'Photo';
   }
 
   factory ChatPreview.fromJson(Map<String, dynamic> json) => ChatPreview(

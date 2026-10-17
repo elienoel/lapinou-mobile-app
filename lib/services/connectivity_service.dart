@@ -42,7 +42,13 @@ class ConnectivityService {
     _subscription = null;
   }
 
+  /// Force l'état de connexion dans les tests (la détection réelle passe par un plugin
+  /// natif et un appel réseau, indisponibles sur la VM de test).
+  @visibleForTesting
+  bool? debugOnlineOverride;
+
   Future<bool> isOnline() async {
+    if (debugOnlineOverride != null) return debugOnlineOverride!;
     try {
       final results = await _connectivity.checkConnectivity();
       if (results.every((r) => r == ConnectivityResult.none)) {

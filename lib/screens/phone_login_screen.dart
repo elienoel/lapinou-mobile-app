@@ -20,13 +20,13 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   String _selectedCountryCode = '+225'; // Côte d'Ivoire par défaut
 
   final List<Map<String, String>> _countryCodes = [
-    {'code': '+225', 'flag': '🇨🇮', 'country': 'Côte d\'Ivoire'},
-    {'code': '+221', 'flag': '🇸🇳', 'country': 'Sénégal'},
-    {'code': '+237', 'flag': '🇨🇲', 'country': 'Cameroun'},
-    {'code': '+229', 'flag': '🇧🇯', 'country': 'Bénin'},
-    {'code': '+226', 'flag': '🇧🇫', 'country': 'Burkina Faso'},
-    {'code': '+228', 'flag': '🇹🇬', 'country': 'Togo'},
-    {'code': '+33', 'flag': '🇫🇷', 'country': 'France'},
+    {'code': '+225', 'country': 'Côte d\'Ivoire'},
+    {'code': '+221', 'country': 'Sénégal'},
+    {'code': '+237', 'country': 'Cameroun'},
+    {'code': '+229', 'country': 'Bénin'},
+    {'code': '+226', 'country': 'Burkina Faso'},
+    {'code': '+228', 'country': 'Togo'},
+    {'code': '+33', 'country': 'France'},
   ];
 
   @override
@@ -183,7 +183,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                                       return DropdownMenuItem<String>(
                                         value: c['code'],
                                         child: Text(
-                                          '${c['flag']} ${c['code']}',
+                                          '${c['code']}',
                                           style: GoogleFonts.outfit(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,

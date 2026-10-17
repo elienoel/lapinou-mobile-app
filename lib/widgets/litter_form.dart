@@ -156,7 +156,7 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Enregistrer une Mise Bas 🧺',
+              'Enregistrer une Mise Bas',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,

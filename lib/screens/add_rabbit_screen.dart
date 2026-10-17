@@ -43,19 +43,13 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   File? _pickedPhotoFile;
   bool _isSaving = false;
 
-  static const List<(String, Color)> _coatColors = [
-    ('Fauve', Color(0xFFC97A3D)),
-    ('Blanc', Color(0xFFF5F5F5)),
-    ('Noir', Color(0xFF1A1A1A)),
-    ('Gris', Color(0xFF9E9E9E)),
-    ('Bleu', Color(0xFF6E7C8C)),
-    ('Havane', Color(0xFF6B4226)),
-    ('Chinchilla', Color(0xFFB0B7BF)),
-    ('Isabelle', Color(0xFFE8D5A9)),
-    ('Loutre', Color(0xFF5C4033)),
-    ('Marron', Color(0xFF7B3F00)),
-    ('Roux', Color(0xFFA0522D)),
-    ('Bicolore', Color(0xFFBDBDBD)),
+  static const List<(String, String)> _coatColors = [
+    ('Fauve', 'assets/colors/fauve.png'),
+    ('Blanc', 'assets/colors/blanc.png'),
+    ('Noir', 'assets/colors/noir.png'),
+    ('Gris', 'assets/colors/gris.png'),
+    ('Bicolore Noir', 'assets/colors/bicolore_noir.png'),
+    ('Bicolore Roux', 'assets/colors/bicolore_roux.png'),
   ];
 
   @override
@@ -365,7 +359,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '🍼 Ses ${context.read<RabbitProvider>().nursingKitsOf(widget.initialRabbitToEdit!.id)} lapereaux non sevrés la suivent dans cette loge.',
+                'Ses ${context.read<RabbitProvider>().nursingKitsOf(widget.initialRabbitToEdit!.id)} lapereaux non sevrés la suivent dans cette loge.',
                 key: const ValueKey('kits-follow-note'),
                 style: const TextStyle(
                   fontSize: 12.5,
@@ -686,26 +680,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
 
                 const SizedBox(height: 20),
 
-                // Name & Tag number
-                _buildSectionTitle('Identification'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom ou Surnom *',
-                    hintText: 'Ex: Bambou, Bella...',
-                    prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Veuillez saisir un nom';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 16),
-
                 // Breed
                 _buildSectionTitle('Race *'),
                 const SizedBox(height: 8),
@@ -747,20 +721,42 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                 _buildSectionTitle('Robe / Couleur'),
                 const SizedBox(height: 8),
                 SizedBox(
-                  height: 80,
+                  height: 100,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
                     itemCount: _coatColors.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
                     itemBuilder: (context, index) {
                       final c = _coatColors[index];
-                      return SizedBox(
-                        width: 80,
-                        height: 80,
-                        child: _buildColorOption(c.$1, c.$2),
+                      return _buildColorCard(
+                        name: c.$1,
+                        imageAsset: c.$2,
+                        selected: _selectedColor == c.$1,
+                        onTap: () => setState(() => _selectedColor = c.$1),
                       );
                     },
                   ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Name & Tag number
+                _buildSectionTitle('Identification'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom ou Surnom *',
+                    hintText: 'Ex: Bambou, Bella...',
+                    prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Veuillez saisir un nom';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 16),
@@ -785,84 +781,96 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
 
                 const SizedBox(height: 16),
 
-                // Weight
-                TextFormField(
-                  controller: _weightController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Poids (kg)',
-                    hintText: 'Ex: 4.2',
-                    suffixText: 'kg',
-                    prefixIcon: Icon(Icons.scale, size: 20),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _weightController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Poids (kg)',
+                          hintText: 'Ex: 4.2',
+                          suffixText: 'kg',
+                          prefixIcon: Icon(Icons.scale, size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Birth date selector
+                    Expanded(
+                      child: InkWell(
+                        onTap: _pickBirthDate,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.cardBorder),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.cake_outlined,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Date de naissance',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            DateFormat(
+                                              'dd MMMM yyyy',
+                                              'fr_FR',
+                                            ).format(_birthDate),
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                Icons.edit_calendar,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 16),
-
-                // Birth date selector
-                InkWell(
-                  onTap: _pickBirthDate,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.cake_outlined,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Date de naissance',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  DateFormat(
-                                    'dd MMMM yyyy',
-                                    'fr_FR',
-                                  ).format(_birthDate),
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const Icon(
-                          Icons.edit_calendar,
-                          color: AppColors.textSecondary,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
 
                 // Genealogy / Pedigree Parents selector
                 _buildSectionTitle('Filiation & Arbre Généalogique'),
@@ -1056,26 +1064,30 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     });
   }
 
-  Widget _buildBreedCard({
+  /// Carte de sélection partagée par la race et la couleur (même gabarit :
+  /// nom en haut à gauche, vignette ancrée en bas à droite).
+  Widget _buildPickerCard({
+    Key? key,
     required String name,
-    required String? imageUrl,
     required bool selected,
     required VoidCallback onTap,
+    required Widget thumbnail,
   }) {
     return InkWell(
-      key: ValueKey('breed-${imageUrl ?? name}'),
+      key: key,
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 140,
-        height: 96,
-        padding: const EdgeInsets.all(10),
+        height: 80,
+        padding: const EdgeInsets.only(left: 12, top: 10, right: 10, bottom: 3),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.cardBorder,
-            width: selected ? 2 : 1,
+          color: selected ? AppColors.primary : AppColors.secondaryTint,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(10),
+            topRight: const Radius.circular(30),
+            bottomLeft: const Radius.circular(0),
+            bottomRight: const Radius.circular(10),
           ),
         ),
         child: Stack(
@@ -1084,34 +1096,24 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
             Positioned(
               left: 0,
               top: 0,
-              right: 54,
+              right: 40,
               child: Text(
                 name,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
                   color: selected ? Colors.white : AppColors.textPrimary,
                 ),
               ),
             ),
             Positioned(
-              bottom: -10,
+              bottom: -5,
               right: -10,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child:
-                    imageUrl != null
-                        ? Image.network(
-                          ApiConstants.formatMediaUrl(imageUrl),
-                          width: 58,
-                          height: 58,
-                          fit: BoxFit.cover,
-                          errorBuilder:
-                              (_, __, ___) => _breedIconFallback(selected),
-                        )
-                        : _breedIconFallback(selected),
+                child: thumbnail,
               ),
             ),
           ],
@@ -1120,7 +1122,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     );
   }
 
-  Widget _breedIconFallback(bool selected) {
+  Widget _pickerIconFallback(bool selected) {
     return Container(
       width: 58,
       height: 58,
@@ -1140,31 +1142,46 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     );
   }
 
-  Widget _buildColorOption(String label, Color swatch) {
-    final isSelected = _selectedColor == label;
-    final labelColor =
-        swatch.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
-    return InkWell(
-      onTap: () => setState(() => _selectedColor = label),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: swatch,
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.cardBorder,
-            width: isSelected ? 3 : 1,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: labelColor,
-          ),
-        ),
+  Widget _buildBreedCard({
+    required String name,
+    required String? imageUrl,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return _buildPickerCard(
+      key: ValueKey('breed-${imageUrl ?? name}'),
+      name: name,
+      selected: selected,
+      onTap: onTap,
+      thumbnail:
+          imageUrl != null
+              ? Image.network(
+                ApiConstants.formatMediaUrl(imageUrl),
+                width: 80,
+                height: 58,
+                fit: BoxFit.fitHeight,
+                errorBuilder: (_, __, ___) => _pickerIconFallback(selected),
+              )
+              : _pickerIconFallback(selected),
+    );
+  }
+
+  Widget _buildColorCard({
+    required String name,
+    required String imageAsset,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return _buildPickerCard(
+      key: ValueKey('color-$imageAsset'),
+      name: name,
+      selected: selected,
+      onTap: onTap,
+      thumbnail: Image.asset(
+        imageAsset,
+        width: 80,
+        height: 80,
+        fit: BoxFit.fitHeight,
       ),
     );
   }
@@ -1185,8 +1202,8 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.cardBorder,
             width: isSelected ? 2 : 1,
@@ -1198,7 +1215,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: isSelected ? AppColors.onPrimary : AppColors.textSecondary,
+            color: AppColors.textSecondary,
           ),
         ),
       ),

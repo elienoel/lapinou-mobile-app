@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lapinou/services/connectivity_service.dart';
 import 'package:lapinou/models/finance_period.dart';
 import 'package:lapinou/models/finance_transaction.dart';
 import 'package:lapinou/providers/auth_provider.dart';
@@ -55,6 +56,7 @@ Future<RabbitProvider> _pump(
 
 void main() {
   setUpAll(() async {
+    ConnectivityService.instance.debugOnlineOverride = true;
     await initializeDateFormatting('fr_FR', null);
   });
 
@@ -129,22 +131,22 @@ void main() {
       expect(find.text('Granulés du mois dernier'), findsOneWidget);
       expect(find.text('Vente ancienne'), findsOneWidget);
       expect(find.text('Depuis le début'), findsOneWidget);
-      expect(find.text('💰 Ventes (2)'), findsOneWidget);
+      expect(find.text('Ventes (2)'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('period-thisMonth')));
       await tester.pumpAndSettle();
       expect(find.text('Vente du jour'), findsOneWidget);
       expect(find.text('Granulés du mois dernier'), findsNothing);
       expect(find.text('Vente ancienne'), findsNothing);
-      expect(find.text('💰 Ventes (1)'), findsOneWidget);
-      expect(find.text('📦 Dépenses (0)'), findsOneWidget);
+      expect(find.text('Ventes (1)'), findsOneWidget);
+      expect(find.text('Dépenses (0)'), findsOneWidget);
       expect(find.text('BILAN · CE MOIS'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('period-lastMonth')));
       await tester.pumpAndSettle();
       expect(find.text('Granulés du mois dernier'), findsOneWidget);
       expect(find.text('Vente du jour'), findsNothing);
-      expect(find.text('📦 Dépenses (1)'), findsOneWidget);
+      expect(find.text('Dépenses (1)'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('period-all')));
       await tester.pumpAndSettle();
@@ -190,8 +192,9 @@ void main() {
         );
       });
 
+      late RabbitProvider provider;
       await http.runWithClient(() async {
-        await _pump(tester, []);
+        provider = await _pump(tester, []);
         await tester.tap(find.text('Enregistrer Vente'));
         await tester.pumpAndSettle();
 
@@ -209,10 +212,10 @@ void main() {
         await tester.pumpAndSettle();
       }, () => client);
 
-      final post = requests.lastWhere((r) => r.startsWith('POST'));
-      final body = jsonDecode(post.substring(post.indexOf('{'))) as Map;
-      expect(body['date'], DateFormat('yyyy-MM-dd').format(today));
-      expect(body['title'], 'Vente lapin');
+      // L'écriture est locale d'abord (synchronisée ensuite) : on lit la transaction créée.
+      final created = provider.finances.first;
+      expect(created.date, DateTime(today.year, today.month, today.day));
+      expect(created.title, 'Vente lapin');
     });
 
     testWidgets('the date of a transaction can be set in the past', (tester) async {
@@ -226,8 +229,9 @@ void main() {
         );
       });
 
+      late RabbitProvider provider;
       await http.runWithClient(() async {
-        await _pump(tester, []);
+        provider = await _pump(tester, []);
         await tester.tap(find.text('Ajouter Dépense'));
         await tester.pumpAndSettle();
 
@@ -244,9 +248,7 @@ void main() {
         await tester.pumpAndSettle();
       }, () => client);
 
-      final post = requests.lastWhere((r) => r.startsWith('POST'));
-      final body = jsonDecode(post.substring(post.indexOf('{'))) as Map;
-      expect(body['date'], '${DateFormat('yyyy-MM').format(today)}-01');
+      expect(provider.finances.first.date, DateTime(today.year, today.month, 1));
     });
   });
 }

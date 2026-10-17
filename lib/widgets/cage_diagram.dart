@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/cage.dart';
+import 'app_icon.dart';
 import '../services/api_constants.dart';
 import '../theme/colors.dart';
 
@@ -198,11 +199,10 @@ class CageDiagram extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '🐰',
-                      style: TextStyle(
-                        fontSize: (innerW * 0.16).clamp(10.0, 34.0),
-                      ),
+                    AppIcon(
+                      AppIcons.rabbit,
+                      size: (innerW * 0.16).clamp(10.0, 34.0),
+                      color: AppColors.primary,
                     ),
                     // Plusieurs lapins dans la même loge : leur nombre
                     if (count > 1)
@@ -217,7 +217,7 @@ class CageDiagram extends StatelessWidget {
                     // Lapereaux non sevrés avec leur mère dans cette loge
                     if (kits > 0)
                       Text(
-                        ' 🍼$kits',
+                        ' +$kits',
                         style: TextStyle(
                           fontSize: (innerW * 0.075).clamp(8.0, 16.0),
                           fontWeight: FontWeight.w800,
@@ -374,7 +374,7 @@ class CageDiagram extends StatelessWidget {
     );
   }
 
-  /// « 🍼 7 lapereaux » : lapereaux non sevrés qui vivent avec la mère de cette loge.
+  /// « 7 lapereaux » : lapereaux non sevrés qui vivent avec la mère de cette loge.
   Widget _kitsLabel(int kits, double nameSize) {
     return Container(
       margin: const EdgeInsets.only(top: 2),
@@ -385,7 +385,7 @@ class CageDiagram extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        '🍼 $kits lapereau${kits > 1 ? 'x' : ''}',
+        '$kits lapereau${kits > 1 ? 'x' : ''}',
         maxLines: 1,
         style: TextStyle(
           fontSize: nameSize * 0.8,
@@ -416,10 +416,17 @@ class CageDiagram extends StatelessWidget {
                 height: size,
                 fit: BoxFit.cover,
                 errorBuilder:
-                    (_, __, ___) =>
-                        Text('🐰', style: TextStyle(fontSize: size * 0.5)),
+                    (_, __, ___) => AppIcon(
+                      AppIcons.rabbit,
+                      size: size * 0.5,
+                      color: AppColors.primary,
+                    ),
               )
-              : Text('🐰', style: TextStyle(fontSize: size * 0.5)),
+              : AppIcon(
+                AppIcons.rabbit,
+                size: size * 0.5,
+                color: AppColors.primary,
+              ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/care.dart';
 import '../models/currency.dart';
 import '../providers/auth_provider.dart';
+import '../providers/pharmacy_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
@@ -14,6 +15,7 @@ import 'main_navigation_screen.dart';
 import 'rabbit_list_screen.dart';
 import 'matings_screen.dart';
 import 'care_screen.dart';
+import 'pharmacy_screen.dart';
 import '../widgets/app_icon.dart';
 
 /// Horizon du rappel sur la page d'accueil : actions dues dans les 3 prochains
@@ -36,6 +38,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       if (token != null && token.isNotEmpty) {
         context.read<RabbitProvider>().fetchAll(token: token);
       }
+      context.read<PharmacyProvider>().fetchAll();
     });
   }
 
@@ -53,6 +56,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
         final balance = totalIncome - totalExpense;
         final currency = context.watch<AuthProvider>().currency;
+        final pharmacyProvider = context.watch<PharmacyProvider>();
 
         return Scaffold(
           body: SafeArea(
@@ -66,7 +70,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   parent: BouncingScrollPhysics(),
                 ),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
+                  horizontal: 16,
                   vertical: 14,
                 ),
                 child: Column(
@@ -99,7 +103,29 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
                     const SizedBox(height: 20),
 
-                    // 2bis. Rappel : actions à mener dans les prochains jours
+                    // 2bis-a. Section "Pharmacie"
+                    _buildMenuCard(
+                      context: context,
+                      icon: Icons.medication_outlined,
+                      title: 'Pharmacie',
+                      subtitle:
+                          'Médicaments, prix par pharmacie et pharmacies à proximité',
+                      badge: '${pharmacyProvider.medications.length} produits',
+                      badgeColor: AppColors.primarySoft,
+                      badgeTextColor: AppColors.primary,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PharmacyScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 2bis-b. Rappel : actions à mener dans les prochains jours
                     _buildReminderSection(context, provider),
 
                     const SizedBox(height: 20),
@@ -109,6 +135,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     // Card 1: Mes lapins
                     _buildMenuCard(
                       context: context,
+                      imageAsset: 'assets/lapins_cages.jpeg',
                       icon: AppIcons.rabbit,
                       title: 'Mes lapins',
                       subtitle:
@@ -130,6 +157,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     _buildMenuCard(
                       context: context,
                       icon: AppIcons.mating,
+                      imageAsset: 'assets/accouplement.png',
                       title: 'Accouplements & Mises bas',
                       subtitle:
                           'Saillies, palpation, mises bas et sevrage des lapereaux',
@@ -156,6 +184,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     _buildMenuCard(
                       context: context,
                       icon: AppIcons.syringe,
+                      imageAsset: 'assets/veto.jpeg',
                       title: 'Soins & entretien',
                       subtitle:
                           'Vaccins, vitamines, déparasitants, historique des soins et rappels',
@@ -267,23 +296,31 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return 'Aucun soin en retard';
   }
 
-  /// Pictogramme d'une carte : une icône vectorielle [AppIcons], ou un emoji (texte).
+  /// Pictogramme d'une carte : une icône vectorielle [AppIcons], ou une icône Material.
   Widget _iconOf(Object icon, {required double size, required Color color}) {
     if (icon is AppIcons) return AppIcon(icon, size: size, color: color);
-    return Text('$icon', style: TextStyle(fontSize: size * 0.85));
+    if (icon is IconData) return Icon(icon, size: size, color: color);
+    return const SizedBox.shrink();
   }
 
   Widget _buildTopHeader(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
-    final farmName =
-        user?.farmName?.isNotEmpty == true
-            ? user!.farmName!
-            : 'Clapier du Val Fleuri';
+    final farmName = user?.farmName?.isNotEmpty == true ? user!.farmName! : '';
+    final displayFirstName =
+        user?.firstName?.trim().isNotEmpty == true
+            ? user!.firstName!
+                .split(RegExp(r'\s+'))
+                .where((part) => part.isNotEmpty)
+                .last
+            : null;
+
     final displayName =
-        user?.firstName?.isNotEmpty == true
-            ? 'Bonjour, ${user!.firstName} 🐰'
-            : 'Bonjour, Éleveur 🐰';
+        user?.lastName?.isNotEmpty == true
+            ? 'Bonjour, ${user!.lastName}'
+            : displayFirstName != null
+            ? 'Bonjour, $displayFirstName'
+            : 'Bonjour, Éleveur';
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -305,14 +342,23 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               children: [
                 Icon(Icons.location_on, size: 14, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
-                Text(
-                  farmName,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
+                (farmName.isEmpty)
+                    ? const Text(
+                      'Nom de ferme non défini',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey,
+                      ),
+                    )
+                    : Text(
+                      farmName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
               ],
             ),
           ],
@@ -367,7 +413,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
           // Stat Card 2: Gestations
           _buildActivityStatCard(
-            icon: '⏳',
+            icon: Icons.hourglass_empty,
             value: '${provider.activePregnanciesCount}',
             label: 'Gestations',
             detail: 'Prochaine dans ~2 j',
@@ -397,7 +443,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
           // Stat Card 5: Finances
           _buildActivityStatCard(
-            icon: '💰',
+            icon: Icons.payments_outlined,
             value: currency.format(balance, showSign: true, decimals: 0),
             label: 'Bilan clapier',
             detail:
@@ -521,13 +567,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     required Color badgeColor,
     required Color badgeTextColor,
     required VoidCallback onTap,
+    String? imageAsset,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder),
+        // border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(5),
@@ -540,20 +587,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.card),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(7),
           child: Row(
             children: [
-              // Icon container
+              // Icon container (ou vignette photo si fournie)
               Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  border: Border.all(color: AppColors.cardBorder),
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(color: badgeColor),
                 alignment: Alignment.center,
-                child: _iconOf(icon, size: 32, color: AppColors.primary),
+                clipBehavior: Clip.antiAlias,
+                child:
+                    imageAsset != null
+                        ? Image.asset(imageAsset, fit: BoxFit.cover)
+                        : _iconOf(icon, size: 32, color: AppColors.primary),
               ),
               const SizedBox(width: 14),
 

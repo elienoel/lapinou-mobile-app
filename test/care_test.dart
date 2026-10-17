@@ -6,6 +6,9 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lapinou/services/sync_service.dart';
+import 'package:lapinou/services/local_database.dart';
+import 'package:lapinou/services/connectivity_service.dart';
 import 'package:lapinou/models/care.dart';
 import 'package:lapinou/providers/auth_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
@@ -81,7 +84,17 @@ class _CareApi {
   List<String> writes() => requests.where((r) => !r.startsWith('GET')).toList();
 }
 
+/// Les écritures sont d'abord locales (file de synchronisation) : on relit la dernière
+/// création mise en file plutôt qu'une requête HTTP immédiate.
+Future<Map<String, dynamic>> _lastQueued(SyncEntity entity) async {
+  final queue = await LocalDatabase.instance.pendingQueue();
+  return queue.lastWhere((q) => q.entity == entity && q.operation == 'create').payload;
+}
+
 Future<RabbitProvider> _pump(WidgetTester tester, {int initialTab = 0}) async {
+  // Base en mémoire vierge pour chaque test (sinon les soins d'un test fuient dans le suivant)
+  await LocalDatabase.instance.switchToUser('reset');
+  await LocalDatabase.instance.switchToUser(null);
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(420, 3200);
   tester.view.devicePixelRatio = 1.0;
@@ -104,6 +117,7 @@ Future<RabbitProvider> _pump(WidgetTester tester, {int initialTab = 0}) async {
 
 void main() {
   setUpAll(() async {
+    ConnectivityService.instance.debugOnlineOverride = true;
     await initializeDateFormatting('fr_FR', null);
   });
 
@@ -178,9 +192,7 @@ void main() {
         await tester.pumpAndSettle();
       }, api.client);
 
-      final post = api.last('POST')!;
-      expect(post, contains('/farm/care-records/'));
-      final body = api.bodyOf(post);
+      final body = await _lastQueued(SyncEntity.careRecord);
       expect(body['treatment'], 5);
       expect(body['rabbits'], ['p-f-2']);
       expect(body['purpose'], 'Prévention VHD');
@@ -215,7 +227,7 @@ void main() {
         await tester.pumpAndSettle();
       }, api.client);
 
-      final body = api.bodyOf(api.last('POST')!);
+      final body = await _lastQueued(SyncEntity.careRecord);
       expect(body['treatment'], 5);
       expect((body['rabbits'] as List), isNotEmpty);
     });
@@ -246,11 +258,10 @@ void main() {
         await tester.pumpAndSettle();
       }, api.client);
 
-      final post = api.last('POST')!;
-      expect(post, contains('/farm/care-treatments/'));
-      expect(api.bodyOf(post), containsPair('name', 'Vitamine ADE'));
-      expect(api.bodyOf(post), containsPair('category', 'vitamin'));
-      expect(api.bodyOf(post), containsPair('renewal_days', 90));
+      final body = await _lastQueued(SyncEntity.careTreatment);
+      expect(body, containsPair('name', 'Vitamine ADE'));
+      expect(body, containsPair('category', 'vitamin'));
+      expect(body, containsPair('renewal_days', 90));
     });
 
     testWidgets('a one-off treatment is sent without renewal', (tester) async {
@@ -263,7 +274,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('treatment-submit')));
         await tester.pumpAndSettle();
       }, api.client);
-      expect(api.bodyOf(api.last('POST')!)['renewal_days'], isNull);
+      expect((await _lastQueued(SyncEntity.careTreatment))['renewal_days'], isNull);
     });
 
     testWidgets('a treatment already used cannot be deleted', (tester) async {

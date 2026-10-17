@@ -239,7 +239,7 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
           const SizedBox(width: 8),
           _buildFilterChip(
             3,
-            'Gestantes ⏳ (${provider.pregnantFemales.length})',
+            'Gestantes (${provider.pregnantFemales.length})',
           ),
         ],
       ),
@@ -451,11 +451,11 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
                           ),
                           child: Text(
                             rabbit.status == RabbitStatus.pregnant
-                                ? '⏳ Gestante'
+                                ? 'Gestante'
                                 : rabbit.status == RabbitStatus.lactating
-                                ? '🍼 Allaitement'
+                                ? 'Allaitement'
                                 : rabbit.status == RabbitStatus.resting
-                                ? '💤 Repos'
+                                ? 'Repos'
                                 : 'Réformé',
                             style: const TextStyle(
                               fontSize: 9,
@@ -488,7 +488,7 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                            '🍼 ${context.read<RabbitProvider>().nursingKitsOf(rabbit.id)}',
+                            '${context.read<RabbitProvider>().nursingKitsOf(rabbit.id)} lapereaux',
                             style: const TextStyle(
                               color: AppColors.statusPregnantText,
                               fontSize: 10.5,
@@ -628,7 +628,7 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('🔍', style: TextStyle(fontSize: 42)),
+          const Icon(Icons.search, size: 42, color: AppColors.textSecondary),
           const SizedBox(height: 12),
           const Text(
             'Aucun lapin trouvé',
@@ -746,7 +746,7 @@ class _CageChip extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '${cage.occupiedCount}/${cage.compartmentsCount} loges${cage.kitsCount > 0 ? ' · 🍼${cage.kitsCount}' : ''}',
+                '${cage.occupiedCount}/${cage.compartmentsCount} loges${cage.kitsCount > 0 ? ' · ${cage.kitsCount} lapereaux' : ''}',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,

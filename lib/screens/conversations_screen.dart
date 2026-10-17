@@ -114,7 +114,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         SizedBox(height: MediaQuery.of(context).size.height * 0.22),
-        const Center(child: Text('💬', style: TextStyle(fontSize: 48))),
+        const Center(child: Icon(Icons.chat_bubble_outline, size: 48, color: AppColors.textSecondary)),
         const SizedBox(height: 12),
         const Center(
           child: Text(

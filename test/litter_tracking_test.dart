@@ -6,6 +6,9 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lapinou/services/connectivity_service.dart';
+import 'package:lapinou/services/sync_service.dart';
+import 'package:lapinou/services/local_database.dart';
 import 'package:lapinou/models/cage.dart';
 import 'package:lapinou/models/litter.dart';
 import 'package:lapinou/providers/auth_provider.dart';
@@ -112,8 +115,17 @@ Future<RabbitProvider> _pump(
   return provider;
 }
 
+
+/// Les écritures sont d'abord locales (file de synchronisation) : on relit la dernière
+/// opération mise en file plutôt qu'une requête HTTP immédiate.
+Future<Map<String, dynamic>> _lastQueued(SyncEntity entity, String operation) async {
+  final queue = await LocalDatabase.instance.pendingQueue();
+  return queue.lastWhere((q) => q.entity == entity && q.operation == operation).payload;
+}
+
 void main() {
   setUpAll(() async {
+    ConnectivityService.instance.debugOnlineOverride = false; // pas de réseau : écritures locales
     await initializeDateFormatting('fr_FR', null);
   });
 
@@ -179,18 +191,18 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: SizedBox(width: 180, child: CageDiagram(cage: cage, compact: true))),
       ));
-      expect(find.text(' 🍼7'), findsOneWidget);
+      expect(find.text(' +7'), findsOneWidget);
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: SingleChildScrollView(child: SizedBox(width: 380, child: CageDiagram(cage: cage)))),
       ));
-      expect(find.text('🍼 7 lapereaux'), findsOneWidget);
+      expect(find.text('7 lapereaux'), findsOneWidget);
 
       final none = _cage(inSlot1: [_occ(1, 'Bella')]);
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: SingleChildScrollView(child: SizedBox(width: 380, child: CageDiagram(cage: none)))),
       ));
-      expect(find.textContaining('🍼'), findsNothing);
+      expect(find.textContaining('lapereau'), findsNothing);
     });
 
     testWidgets('a cage card announces the kits living in it', (tester) async {
@@ -198,7 +210,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: CageCard(cage: cage, width: 220)),
       ));
-      expect(find.text('🍼 5 lapereaux'), findsOneWidget);
+      expect(find.text('5 lapereaux'), findsOneWidget);
     });
   });
 
@@ -253,7 +265,7 @@ void main() {
       final luna = provider.rabbits.firstWhere((r) => r.id == 'p-f-2');
       await provider.updateRabbit(luna.copyWith(cageId: '1', compartmentNumber: 2));
       await tester.pumpAndSettle();
-      expect(find.text('📍 Cage A1 · loge 2'), findsOneWidget);
+      expect(find.text('Cage A1 · loge 2'), findsOneWidget);
     });
 
     testWidgets('weaning everyone creates one record per kit', (tester) async {
@@ -422,7 +434,7 @@ void main() {
         await tester.pumpAndSettle();
       }, api.client);
 
-      final body = api.bodyOf(api.last('POST')!);
+      final body = await _lastQueued(SyncEntity.litter, 'create');
       expect(body['birth_date'], iso(target));
       expect(body['born_alive'], 6);
       expect(find.textContaining('Mise bas du ${_fmt(target)} enregistrée'), findsOneWidget);
@@ -445,7 +457,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('🍼 7 lapereaux au nid'), findsOneWidget);
+      expect(find.text('7 lapereaux au nid'), findsOneWidget);
 
       await tester.tap(find.text('Descendance'));
       await tester.pumpAndSettle();
@@ -481,7 +493,7 @@ void main() {
     testWidgets('the rabbit list badges a doe that has kits', (tester) async {
       await _pump(tester, const RabbitListScreen(), litters: [_litter('n1', alive: 7)]);
       expect(find.byKey(const ValueKey('kits-badge-p-f-2')), findsOneWidget);
-      expect(find.text('🍼 7'), findsOneWidget);
+      expect(find.text('7 lapereaux'), findsOneWidget);
       expect(find.byKey(const ValueKey('kits-badge-p-f-1')), findsNothing);
     });
   });
@@ -499,14 +511,14 @@ void main() {
       await http.runWithClient(() async {
         await tester.tap(find.text('2')); // loge 2, libre
         await tester.pumpAndSettle();
-        expect(find.textContaining('🍼 ses 7 lapereaux la suivront'), findsOneWidget);
+        expect(find.textContaining('ses 7 lapereaux la suivront'), findsOneWidget);
         await tester.tap(find.textContaining('Luna'));
         await tester.pumpAndSettle();
       }, api.client);
 
-      final patch = api.last('PATCH')!;
-      expect(patch, contains('/rabbits/p-f-2/'));
-      expect(api.bodyOf(patch), {'cage': 1, 'compartment_number': 2});
+      final patch = await _lastQueued(SyncEntity.rabbit, 'update');
+      expect(patch, containsPair('cage', 1));
+      expect(patch, containsPair('compartment_number', 2));
       expect(find.textContaining('Luna placé avec ses 7 lapereaux'), findsOneWidget);
     });
 
@@ -516,7 +528,7 @@ void main() {
         const CageDetailScreen(cageId: '1'),
         cages: [_cage(inSlot1: [_occ(50, 'Bella', kits: 6)])],
       );
-      expect(find.text('🍼 6 lapereau(x) au nid'), findsOneWidget);
+      expect(find.text('6 lapereau(x) au nid'), findsOneWidget);
       await tester.tap(find.text('1'));
       await tester.pumpAndSettle();
       expect(find.textContaining('avec 6 lapereaux'), findsOneWidget);

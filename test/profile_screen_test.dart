@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lapinou/services/connectivity_service.dart';
 import 'package:lapinou/providers/auth_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
 import 'package:lapinou/screens/profile_screen.dart';
@@ -47,6 +48,7 @@ Future<void> _pumpProfile(WidgetTester tester) async {
 
 void main() {
   setUpAll(() async {
+    ConnectivityService.instance.debugOnlineOverride = true;
     await initializeDateFormatting('fr_FR', null);
   });
 
@@ -69,7 +71,7 @@ void main() {
     await _pumpProfile(tester);
 
     expect(find.text('Awa Koné'), findsOneWidget);
-    expect(find.text('🏡 Clapier du Lac'), findsOneWidget);
+    expect(find.text('Clapier du Lac'), findsNWidgets(2));
     expect(find.text('+2250102030405'), findsOneWidget);
     expect(find.textContaining('Membre depuis le 5 mars 2026'), findsOneWidget);
     // statistiques de l'élevage
@@ -80,7 +82,7 @@ void main() {
     expect(find.text('Informations personnelles'), findsOneWidget);
     expect(find.text('Awa'), findsOneWidget);
     expect(find.text('Koné'), findsOneWidget);
-    expect(find.text('Bouaké'), findsOneWidget);
+    expect(find.text('Bouaké'), findsNWidgets(2));
     expect(find.text('awa@lac.ci'), findsOneWidget);
     expect(find.byType(TextFormField), findsNothing);
     expect(find.text('Enregistrer'), findsNothing);

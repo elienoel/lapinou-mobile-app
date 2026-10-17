@@ -6,6 +6,7 @@ import 'providers/rabbit_provider.dart';
 import 'providers/community_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/chat_provider.dart';
+import 'providers/pharmacy_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/phone_login_screen.dart';
 import 'services/sync_service.dart';
@@ -41,6 +42,7 @@ class LapinouApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
+        ChangeNotifierProvider(create: (_) => PharmacyProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create: (_) => ChatProvider(),
           update:

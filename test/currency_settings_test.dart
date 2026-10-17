@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lapinou/services/connectivity_service.dart';
 import 'package:lapinou/models/currency.dart';
 import 'package:lapinou/providers/auth_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
@@ -50,6 +51,7 @@ http.Response _json(Map<String, dynamic> body, [int status = 200]) => http.Respo
 
 void main() {
   setUpAll(() async {
+    ConnectivityService.instance.debugOnlineOverride = true;
     await initializeDateFormatting('fr_FR', null);
   });
 

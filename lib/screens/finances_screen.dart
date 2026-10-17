@@ -75,7 +75,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
     final selected = _period.kind == kind;
     final label =
         kind == FinancePeriodKind.custom
-            ? (selected ? _period.describe() : '📅 Personnalisé')
+            ? (selected ? _period.describe() : 'Personnalisé')
             : FinancePeriod(kind).label;
     return InkWell(
       key: ValueKey('period-${kind.name}'),
@@ -159,11 +159,11 @@ class _FinancesScreenState extends State<FinancesScreen> {
                       Text(
                         isEditing
                             ? (isIncome
-                                ? 'Modifier la Vente 💰'
-                                : 'Modifier la Dépense 📦')
+                                ? 'Modifier la Vente'
+                                : 'Modifier la Dépense')
                             : (isIncome
-                                ? 'Enregistrer une Vente 💰'
-                                : 'Enregistrer une Dépense 📦'),
+                                ? 'Enregistrer une Vente'
+                                : 'Enregistrer une Dépense'),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -700,12 +700,12 @@ class _FinancesScreenState extends State<FinancesScreen> {
                           const SizedBox(width: 8),
                           _buildFilterTab(
                             1,
-                            '📦 Dépenses (${totals.expenseCount})',
+                            'Dépenses (${totals.expenseCount})',
                           ),
                           const SizedBox(width: 8),
                           _buildFilterTab(
                             2,
-                            '💰 Ventes (${totals.incomeCount})',
+                            'Ventes (${totals.incomeCount})',
                           ),
                         ],
                       ),

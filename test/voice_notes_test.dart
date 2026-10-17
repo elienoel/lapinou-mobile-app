@@ -130,7 +130,7 @@ void main() {
         'created_at': '2026-09-26T10:00:00Z',
       }));
       expect(c.last!.hasAudio, isTrue);
-      expect(c.last!.text, '🎤 Message vocal');
+      expect(c.last!.text, 'Message vocal');
     });
   });
 

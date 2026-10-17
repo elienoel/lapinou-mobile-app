@@ -51,5 +51,7 @@
 	<string>Lapinou a besoin d'accéder à votre galerie pour ajouter des photos et vidéos à vos publications.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Lapinou a besoin d'accéder au micro pour vous permettre d'enregistrer des notes vocales.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Lapinou a besoin de votre position pour afficher les pharmacies les plus proches de vous sur la carte.</string>
 </dict>
 </plist>

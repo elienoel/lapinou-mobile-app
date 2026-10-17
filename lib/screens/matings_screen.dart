@@ -1193,7 +1193,7 @@ class _MatingsScreenState extends State<MatingsScreen>
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            isPassed ? '✓ Fait' : dayBadge,
+            isPassed ? 'Fait' : dayBadge,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,

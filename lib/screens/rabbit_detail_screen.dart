@@ -328,7 +328,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                                     .watch<RabbitProvider>()
                                     .nursingKitsOf(r.id);
                                 return Text(
-                                  '🍼 $n lapereau${n > 1 ? 'x' : ''} au nid',
+                                  '$n lapereau${n > 1 ? 'x' : ''} au nid',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -1350,7 +1350,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
     if (mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Photo principale mise à jour ! ⭐'),
+          content: Text('Photo principale mise à jour !'),
           backgroundColor: AppColors.primary,
         ),
       );

@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lapinou/services/connectivity_service.dart';
 import 'package:lapinou/models/mating.dart';
 import 'package:lapinou/providers/auth_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
@@ -88,6 +89,7 @@ Future<RabbitProvider> _pump(WidgetTester tester, {int initialTab = 0}) async {
 
 void main() {
   setUpAll(() async {
+    ConnectivityService.instance.debugOnlineOverride = true;
     await initializeDateFormatting('fr_FR', null);
   });
 
@@ -281,7 +283,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('kindle-mat-1')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Enregistrer une Mise Bas 🧺'), findsOneWidget);
+      expect(find.text('Enregistrer une Mise Bas'), findsOneWidget);
       expect(find.byKey(const ValueKey('litter-mating-dropdown')), findsNothing, reason: 'accouplement imposé');
       expect(find.textContaining('Mère : Bella'), findsOneWidget);
       expect(find.byKey(const ValueKey('litter-birth-date')), findsOneWidget);

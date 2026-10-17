@@ -8,7 +8,6 @@ class ActivityCard extends StatelessWidget {
   final String categoryTag;
   final String timeOrDate;
   final IconData categoryIcon;
-  final String emoji;
   final Color? badgeColor;
   final VoidCallback? onTap;
 
@@ -19,7 +18,6 @@ class ActivityCard extends StatelessWidget {
     required this.categoryTag,
     required this.timeOrDate,
     this.categoryIcon = Icons.pets,
-    this.emoji = '🐰',
     this.badgeColor,
     this.onTap,
   });
@@ -55,7 +53,7 @@ class ActivityCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               alignment: Alignment.center,
-              child: Text(emoji, style: const TextStyle(fontSize: 28)),
+              child: Icon(categoryIcon, size: 28, color: AppColors.primary),
             ),
             const SizedBox(width: 12),
             // Middle & right details

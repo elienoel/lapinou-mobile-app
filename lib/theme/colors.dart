@@ -15,6 +15,12 @@ class AppColors {
   /// la couleur principale à très faible opacité (comme la bulle verte de WhatsApp).
   static final Color primaryTint = primary.withAlpha(9);
 
+  // ---- Couleur secondaire ---------------------------------------------------
+  /// Utilisée pour les cartes de race du formulaire lapin (fond teinté, 0.3 d'opacité) :
+  /// seconde exception à la règle fond plein/blanc, au même titre que `primaryTint`.
+  static const Color secondary = Color(0xFFF97E4B);
+  static final Color secondaryTint = secondary.withAlpha(15); // 0.3 * 255
+
   /// Anciennes variantes de la couleur principale : identiques à `primary`
   static const Color primaryDark = primary;
   static const Color primaryLight = primary;

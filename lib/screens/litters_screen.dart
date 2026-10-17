@@ -408,7 +408,7 @@ class _LittersViewState extends State<LittersView> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  '📍 Cage ${cage.name} · loge ${mother!.compartmentNumber}',
+                  'Cage ${cage.name} · loge ${mother!.compartmentNumber}',
                   key: ValueKey('litter-location-${lit.id}'),
                   style: const TextStyle(
                     fontSize: 12,

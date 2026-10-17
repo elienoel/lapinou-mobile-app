@@ -242,7 +242,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('📭', style: TextStyle(fontSize: 48)),
+                    const Icon(Icons.inbox_outlined, size: 48, color: AppColors.textSecondary),
                     const SizedBox(height: 12),
                     Text(
                       _selectedFilter == 'Tous'
@@ -412,7 +412,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                               if (post.authorFarm != null &&
                                   post.authorFarm!.isNotEmpty)
                                 Text(
-                                  '🏡 ${post.authorFarm}',
+                                  post.authorFarm!,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(fontSize: 11, color: sub),

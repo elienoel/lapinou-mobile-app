@@ -55,7 +55,7 @@ class AppIcon extends StatelessWidget {
   }
 }
 
-/// Pictogramme d'une famille de soins : la seringue pour les vaccins, l'emoji de la famille sinon.
+/// Pictogramme d'une famille de soins : la seringue pour les vaccins, une icône Material sinon.
 class CareCategoryIcon extends StatelessWidget {
   final CareCategory category;
   final double size;
@@ -68,17 +68,20 @@ class CareCategoryIcon extends StatelessWidget {
     this.color,
   });
 
+  static IconData _materialIcon(CareCategory c) => switch (c) {
+    CareCategory.vitamin => Icons.eco_outlined,
+    CareCategory.deworming => Icons.bug_report_outlined,
+    CareCategory.antiparasitic => Icons.pest_control_outlined,
+    CareCategory.coccidiosis => Icons.science_outlined,
+    CareCategory.antibiotic => Icons.medication_outlined,
+    _ => Icons.medical_services_outlined,
+  };
+
   @override
   Widget build(BuildContext context) {
     if (category == CareCategory.vaccine) {
       return AppIcon(AppIcons.syringe, size: size, color: color);
     }
-    return SizedBox(
-      width: size,
-      height: size,
-      child: FittedBox(
-        child: Text(category.emoji, style: TextStyle(fontSize: size * 0.85)),
-      ),
-    );
+    return Icon(_materialIcon(category), size: size, color: color);
   }
 }

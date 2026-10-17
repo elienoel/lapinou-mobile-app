@@ -1,18 +1,17 @@
 /// Famille d'un type de soin (correspond à `CareTreatment.category` côté API).
 enum CareCategory {
-  vaccine('vaccine', 'Vaccin', '💉'),
-  vitamin('vitamin', 'Vitamine', '🍊'),
-  deworming('deworming', 'Déparasitant', '🪱'),
-  antiparasitic('antiparasitic', 'Anti-parasitaire externe', '🪰'),
-  coccidiosis('coccidiosis', 'Anti-coccidien', '🧪'),
-  antibiotic('antibiotic', 'Antibiotique', '💊'),
-  other('other', 'Autre', '🩺');
+  vaccine('vaccine', 'Vaccin'),
+  vitamin('vitamin', 'Vitamine'),
+  deworming('deworming', 'Déparasitant'),
+  antiparasitic('antiparasitic', 'Anti-parasitaire externe'),
+  coccidiosis('coccidiosis', 'Anti-coccidien'),
+  antibiotic('antibiotic', 'Antibiotique'),
+  other('other', 'Autre');
 
   final String apiValue;
   final String label;
-  final String emoji;
 
-  const CareCategory(this.apiValue, this.label, this.emoji);
+  const CareCategory(this.apiValue, this.label);
 
   static CareCategory fromApi(Object? value) => CareCategory.values.firstWhere(
     (c) => c.apiValue == value?.toString(),

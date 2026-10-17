@@ -98,4 +98,12 @@ class ApiConstants {
   static String get financesUrl => '$baseUrl/farm/finances/';
   static String financeDetailUrl(String id) => '$baseUrl/farm/finances/$id/';
   static String get financeSummaryUrl => '$baseUrl/farm/finances/summary/';
+
+  // Module Pharmacie : catalogue de médicaments et répertoire de pharmacies
+  static String get medicationsUrl => '$baseUrl/pharmacy/medications/';
+  static String medicationDetailUrl(String id) =>
+      '$baseUrl/pharmacy/medications/$id/';
+  static String get pharmaciesUrl => '$baseUrl/pharmacy/pharmacies/';
+  static String pharmacyDetailUrl(String id) =>
+      '$baseUrl/pharmacy/pharmacies/$id/';
 }

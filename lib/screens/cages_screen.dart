@@ -65,7 +65,7 @@ class CageSummaryBar extends StatelessWidget {
           item('$totalSlots', 'Loges'),
           item('$occupied', 'Occupées'),
           item('${totalSlots - occupied}', 'Libres'),
-          if (kits > 0) item('🍼 $kits', 'Lapereaux'),
+          if (kits > 0) item('$kits', 'Lapereaux'),
         ],
       ),
     );
@@ -170,7 +170,7 @@ class CageCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '🍼 ${cage.kitsCount} lapereau${cage.kitsCount > 1 ? 'x' : ''}',
+                      '${cage.kitsCount} lapereau${cage.kitsCount > 1 ? 'x' : ''}',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -551,7 +551,7 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
                       ),
                       subtitle: Text(
                         o.nursingKits > 0
-                            ? '${o.tagNumber} · 🍼 avec ${o.nursingKits} lapereau${o.nursingKits > 1 ? 'x' : ''}'
+                            ? '${o.tagNumber} · avec ${o.nursingKits} lapereau${o.nursingKits > 1 ? 'x' : ''}'
                             : o.tagNumber,
                       ),
                       onTap: () => Navigator.pop(ctx, 'view:${o.id}'),
@@ -691,7 +691,7 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
                                     ),
                                     subtitle: Text(
                                       '${moving ? '${r.tagNumber} · actuellement en ${r.cageNumber}' : '${r.tagNumber} · sans cage'}'
-                                      '${provider.nursingKitsOf(r.id) > 0 ? '\n🍼 ses ${provider.nursingKitsOf(r.id)} lapereaux la suivront' : ''}',
+                                      '${provider.nursingKitsOf(r.id) > 0 ? '\nses ${provider.nursingKitsOf(r.id)} lapereaux la suivront' : ''}',
                                     ),
                                     onTap: () => Navigator.pop(ctx, r),
                                   );
@@ -793,11 +793,11 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
                       ),
                       _chip('${cage.rabbitsCount} lapin(s)'),
                       if (cage.kitsCount > 0)
-                        _chip('🍼 ${cage.kitsCount} lapereau(x) au nid'),
+                        _chip('${cage.kitsCount} lapereau(x) au nid'),
                       _chip('${cage.occupiedCount} loge(s) occupée(s)'),
                       _chip('${cage.freeCount} libre(s)'),
                       if (cage.location != null && cage.location!.isNotEmpty)
-                        _chip('📍 ${cage.location}'),
+                        _chip(cage.location!),
                     ],
                   ),
                   if (cage.notes != null && cage.notes!.isNotEmpty) ...[

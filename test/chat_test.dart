@@ -31,7 +31,7 @@ void main() {
       ));
       expect(c.other.name, 'Kofi Mensah');
       expect(c.unread, 3);
-      expect(c.last!.text, '📷 Photo');
+      expect(c.last!.text, 'Photo');
       expect(c.last!.senderId, 2);
     });
 
@@ -91,7 +91,7 @@ void main() {
           ));
       final chat = ChatProvider(client: client)..setToken('tok');
       expect(
-        () => chat.sendMessage(1, text: ''),
+        () => chat.sendMessage(1, text: 'Bonjour'),
         throwsA(isA<ChatSendException>().having(
             (e) => e.message, 'message', 'Écrivez un message ou joignez une photo.')),
       );

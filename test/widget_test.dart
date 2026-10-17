@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lapinou/models/rabbit.dart';
 import 'package:lapinou/models/mating.dart';
 import 'package:lapinou/models/litter.dart';
+import 'package:lapinou/providers/pharmacy_provider.dart';
 import 'package:lapinou/providers/rabbit_provider.dart';
 import 'package:lapinou/providers/auth_provider.dart';
 import 'package:lapinou/providers/community_provider.dart';
@@ -76,13 +77,14 @@ void main() {
             value: communityProvider,
           ),
           ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
+          ChangeNotifierProvider<PharmacyProvider>(create: (_) => PharmacyProvider()),
         ],
         child: const MaterialApp(home: HomeDashboardScreen()),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Bonjour, Éleveur 🐰'), findsOneWidget);
+    expect(find.text('Bonjour, Éleveur'), findsOneWidget);
     expect(find.text('Résumé de l\'activité'), findsOneWidget);
     expect(find.text('Mes lapins'), findsOneWidget);
     // Accouplements et mises bas sont regroupés sur une seule carte / une seule page
@@ -106,6 +108,7 @@ void main() {
             create: (_) => CommunityProvider(),
           ),
           ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
+          ChangeNotifierProvider<PharmacyProvider>(create: (_) => PharmacyProvider()),
         ],
         child: const MaterialApp(home: MainNavigationScreen()),
       ),
