@@ -6,12 +6,12 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lapinou/services/connectivity_service.dart';
-import 'package:lapinou/models/mating.dart';
-import 'package:lapinou/providers/auth_provider.dart';
-import 'package:lapinou/providers/rabbit_provider.dart';
-import 'package:lapinou/screens/matings_screen.dart';
-import 'package:lapinou/widgets/litter_form.dart';
+import 'package:clap_in/services/connectivity_service.dart';
+import 'package:clap_in/models/mating.dart';
+import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/rabbit_provider.dart';
+import 'package:clap_in/screens/matings_screen.dart';
+import 'package:clap_in/widgets/litter_form.dart';
 
 DateTime _daysAgo(int n) => DateTime.now().subtract(Duration(days: n));
 

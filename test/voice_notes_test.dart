@@ -3,11 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:lapinou/models/chat.dart';
-import 'package:lapinou/providers/chat_provider.dart';
-import 'package:lapinou/screens/chat_screen.dart';
-import 'package:lapinou/services/voice_services.dart';
-import 'package:lapinou/widgets/voice_message_player.dart';
+import 'package:clap_in/models/chat.dart';
+import 'package:clap_in/providers/chat_provider.dart';
+import 'package:clap_in/screens/chat_screen.dart';
+import 'package:clap_in/services/voice_services.dart';
+import 'package:clap_in/widgets/voice_message_player.dart';
 import 'support/chat_fakes.dart';
 
 /// Faux micro : écrit un petit fichier et note ce qui lui est demandé.

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lapinou/models/community_post.dart';
-import 'package:lapinou/widgets/post_media.dart';
-import 'package:lapinou/widgets/reaction_picker.dart';
+import 'package:clap_in/models/community_post.dart';
+import 'package:clap_in/widgets/post_media.dart';
+import 'package:clap_in/widgets/reaction_picker.dart';
 
 List<PostMedia> _images(int n) => List.generate(
   n,

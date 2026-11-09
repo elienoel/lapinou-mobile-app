@@ -1,3 +1,5 @@
+import '../utils/formatters.dart';
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -201,7 +203,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                             labelText: 'Date *',
                             prefixIcon: Icon(Icons.event_outlined, size: 20),
                           ),
-                          child: Text(DateFormat('dd/MM/yyyy').format(txDate)),
+                          child: Text(formatDate(txDate)),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -318,12 +320,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
 
                             final amountError = Validators.amount(amount);
                             if (amountError != null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(amountError),
-                                  backgroundColor: Colors.red.shade700,
-                                ),
-                              );
+                              showAppSnack(context, amountError, error: true);
                               return;
                             }
                             if (title.isNotEmpty) {
@@ -394,34 +391,12 @@ class _FinancesScreenState extends State<FinancesScreen> {
                           onPressed: () async {
                             final messenger = ScaffoldMessenger.of(context);
                             final navigator = Navigator.of(ctx);
-                            final ok = await showDialog<bool>(
-                              context: ctx,
-                              builder:
-                                  (dialogCtx) => AlertDialog(
-                                    title: const Text(
-                                      'Supprimer cette transaction ?',
-                                    ),
-                                    content: Text(
-                                      '« ${existing.title} » sera retiré des totaux. Cette action est définitive.',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed:
-                                            () =>
-                                                Navigator.pop(dialogCtx, false),
-                                        child: const Text('Annuler'),
-                                      ),
-                                      FilledButton(
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: Colors.red.shade700,
-                                        ),
-                                        onPressed:
-                                            () =>
-                                                Navigator.pop(dialogCtx, true),
-                                        child: const Text('Supprimer'),
-                                      ),
-                                    ],
-                                  ),
+                            final ok = await confirmAction(
+                              ctx,
+                              title: 'Supprimer cette transaction ?',
+                              message:
+                                  '« ${existing.title} » sera retiré des totaux. Cette action est définitive.',
+                              destructive: true,
                             );
                             if (ok != true) return;
                             await provider.deleteFinanceTransaction(
@@ -703,10 +678,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                             'Dépenses (${totals.expenseCount})',
                           ),
                           const SizedBox(width: 8),
-                          _buildFilterTab(
-                            2,
-                            'Ventes (${totals.incomeCount})',
-                          ),
+                          _buildFilterTab(2, 'Ventes (${totals.incomeCount})'),
                         ],
                       ),
                     ),
@@ -717,11 +689,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(AppRadius.card),
-                          border: Border.all(color: AppColors.cardBorder),
-                        ),
+                        decoration: appCardDecoration(),
                         child: const Center(
                           child: Text(
                             'Aucune transaction sur cette période.',
@@ -787,18 +755,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(5),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: appCardDecoration(shadow: true),
       child: Row(
         children: [
           Container(
@@ -858,11 +815,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(color: AppColors.cardBorder),
-        ),
+        decoration: appCardDecoration(),
         child: Row(
           children: [
             Container(

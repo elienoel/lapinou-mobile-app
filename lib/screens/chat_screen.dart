@@ -1,3 +1,4 @@
+import '../widgets/app_ui.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -272,9 +273,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         local.sending = false;
         local.failed = true;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: AppColors.primary),
-      );
+      showAppSnack(context, e.message);
     }
   }
 
@@ -292,12 +291,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // ---- Notes vocales ----
 
-  void _toastError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
-    );
-  }
-
   Future<void> _startRecording() async {
     if (_recording) return;
     final recorder = VoiceServices.recorder();
@@ -305,7 +298,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!await recorder.requestPermission()) {
         await recorder.dispose();
         if (mounted) {
-          _toastError(
+          showAppSnack(
+            context,
             "Autorisez l'accès au micro dans les réglages pour envoyer des notes vocales.",
           );
         }
@@ -332,7 +326,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       });
     } catch (e) {
       await recorder.dispose();
-      if (mounted) _toastError("Impossible de démarrer l'enregistrement.");
+      if (mounted)
+        showAppSnack(context, "Impossible de démarrer l'enregistrement.");
     }
   }
 
@@ -364,17 +359,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     path ??= fallbackPath;
     if (path == null || durationMs < _minRecordMs) {
       if (path != null) File(path).delete().catchError((_) => File(path!));
-      if (mounted) _toastError('Message vocal trop court');
+      if (mounted) showAppSnack(context, 'Message vocal trop court');
       return;
     }
     if (!mounted) return;
     if (auto) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Durée maximale de 5 minutes atteinte : message envoyé.',
-          ),
-        ),
+      showAppSnack(
+        context,
+        'Durée maximale de 5 minutes atteinte : message envoyé.',
       );
     }
 
@@ -403,12 +395,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (x != null && mounted) setState(() => _pendingImage = File(x.path));
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Impossible d'accéder à la photo."),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        showAppSnack(context, "Impossible d'accéder à la photo.");
       }
     }
   }
@@ -537,7 +524,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.waving_hand_outlined, size: 42, color: AppColors.textSecondary),
+            const Icon(
+              Icons.waving_hand_outlined,
+              size: 42,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: 8),
             Text(
               'Dites bonjour à ${_other.name}',

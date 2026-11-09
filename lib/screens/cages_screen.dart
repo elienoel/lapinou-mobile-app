@@ -1,3 +1,4 @@
+import '../widgets/app_ui.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,14 +9,6 @@ import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/cage_diagram.dart';
 import 'rabbit_detail_screen.dart';
-
-void _snack(BuildContext context, String message, {bool error = false}) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
-    );
-}
 
 /// Bandeau récapitulatif : cages, loges, occupées, libres.
 class CageSummaryBar extends StatelessWidget {
@@ -308,7 +301,7 @@ Future<void> showCageForm(BuildContext context, {Cage? edit}) {
             if (result == null) {
               Navigator.pop(ctx);
               if (context.mounted) {
-                _snack(
+                showAppSnack(
                   context,
                   edit == null ? 'Cage $name créée' : 'Cage $name mise à jour',
                 );
@@ -486,7 +479,7 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
     );
     final withKits =
         kits > 0 ? ' avec ses $kits lapereau${kits > 1 ? 'x' : ''}' : '';
-    _snack(
+    showAppSnack(
       context,
       error ??
           '${rabbit.name} placé$withKits : ${cage.compartmentLabel(slot.number).toLowerCase()}',
@@ -602,7 +595,7 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
       final kits = math.max(provider.nursingKitsOf(id), leaving.nursingKits);
       final withKits =
           kits > 0 ? ' avec ses $kits lapereau${kits > 1 ? 'x' : ''}' : '';
-      _snack(
+      showAppSnack(
         context,
         error ??
             '${leaving.name} retiré$withKits de ${cage.compartmentLabel(slot.number).toLowerCase()}',
@@ -705,30 +698,13 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
   }
 
   Future<void> _confirmDelete(Cage cage) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: Text('Supprimer la cage ${cage.name} ?'),
-            content: Text(
-              cage.rabbitsCount > 0
-                  ? 'Les ${cage.rabbitsCount} lapin(s) qu\'elle contient resteront dans l\'élevage, sans cage.'
-                  : 'Cette action est définitive.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annuler'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Supprimer'),
-              ),
-            ],
-          ),
+    final ok = await confirmAction(
+      context,
+      title: 'Supprimer la cage ${cage.name} ?',
+      message:
+          cage.rabbitsCount > 0
+              ? 'Les ${cage.rabbitsCount} lapin(s) qu\'elle contient resteront dans l\'élevage, sans cage.'
+              : 'Cette action est définitive.',
     );
     if (ok != true || !mounted) return;
     final navigator = Navigator.of(context);
@@ -737,7 +713,7 @@ class _CageDetailScreenState extends State<CageDetailScreen> {
     if (deleted) {
       navigator.pop();
     } else {
-      _snack(context, 'Suppression impossible', error: true);
+      showAppSnack(context, 'Suppression impossible', error: true);
     }
   }
 

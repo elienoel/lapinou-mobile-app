@@ -237,10 +237,7 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
           const SizedBox(width: 8),
           _buildFilterChip(2, 'Femelles ♀ (${provider.females.length})'),
           const SizedBox(width: 8),
-          _buildFilterChip(
-            3,
-            'Gestantes (${provider.pregnantFemales.length})',
-          ),
+          _buildFilterChip(3, 'Gestantes (${provider.pregnantFemales.length})'),
         ],
       ),
     );

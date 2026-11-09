@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lapinou/services/local_database.dart';
-import 'package:lapinou/services/sync_service.dart';
+import 'package:clap_in/services/local_database.dart';
+import 'package:clap_in/services/sync_service.dart';
 
 final _run = DateTime.now().microsecondsSinceEpoch;
 

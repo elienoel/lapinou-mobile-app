@@ -1,3 +1,4 @@
+import '../widgets/app_ui.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -44,12 +45,12 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   bool _isSaving = false;
 
   static const List<(String, String)> _coatColors = [
-    ('Fauve', 'assets/colors/fauve.png'),
-    ('Blanc', 'assets/colors/blanc.png'),
-    ('Noir', 'assets/colors/noir.png'),
-    ('Gris', 'assets/colors/gris.png'),
-    ('Bicolore Noir', 'assets/colors/bicolore_noir.png'),
-    ('Bicolore Roux', 'assets/colors/bicolore_roux.png'),
+    ('Fauve', 'assets/colors/fauve.webp'),
+    ('Blanc', 'assets/colors/blanc.webp'),
+    ('Noir', 'assets/colors/noir.webp'),
+    ('Gris', 'assets/colors/gris.webp'),
+    ('Bicolore Noir', 'assets/colors/bicolore_noir.webp'),
+    ('Bicolore Roux', 'assets/colors/bicolore_roux.webp'),
   ];
 
   @override
@@ -374,9 +375,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
-    );
+    showAppSnack(context, message, error: true);
   }
 
   Future<void> _saveRabbit() async {
@@ -400,11 +399,10 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       return;
     }
     if (tagTaken) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('La bague $tag est déjà utilisée dans votre élevage.'),
-          backgroundColor: Colors.red.shade700,
-        ),
+      showAppSnack(
+        context,
+        'La bague $tag est déjà utilisée dans votre élevage.',
+        error: true,
       );
       return;
     }
@@ -449,12 +447,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lapin ${newRabbit.name} mis à jour avec succès'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        showAppSnack(context, 'Lapin ${newRabbit.name} mis à jour avec succès');
       }
     } else {
       await provider.addRabbit(
@@ -463,11 +456,9 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
         token: auth.token,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lapin ${newRabbit.name} enregistré avec succès !'),
-            backgroundColor: AppColors.primary,
-          ),
+        showAppSnack(
+          context,
+          'Lapin ${newRabbit.name} enregistré avec succès !',
         );
       }
     }

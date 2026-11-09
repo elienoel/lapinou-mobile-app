@@ -1,4 +1,4 @@
-# lapinou
+# clap-in
 
 A new Flutter project.
 

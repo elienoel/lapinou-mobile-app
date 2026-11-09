@@ -6,12 +6,12 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lapinou/providers/auth_provider.dart';
-import 'package:lapinou/providers/chat_provider.dart';
-import 'package:lapinou/theme/colors.dart';
-import 'package:lapinou/providers/community_provider.dart';
-import 'package:lapinou/screens/community_feed_screen.dart';
-import 'package:lapinou/widgets/comments_sheet.dart';
+import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/chat_provider.dart';
+import 'package:clap_in/theme/colors.dart';
+import 'package:clap_in/providers/community_provider.dart';
+import 'package:clap_in/screens/community_feed_screen.dart';
+import 'package:clap_in/widgets/comments_sheet.dart';
 
 Map<String, dynamic> _post(
   int id,

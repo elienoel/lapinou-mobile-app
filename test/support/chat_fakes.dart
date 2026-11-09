@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lapinou/providers/auth_provider.dart';
-import 'package:lapinou/providers/chat_provider.dart';
+import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/chat_provider.dart';
 
 http.Response okResponse(dynamic data, {int status = 200}) => http.Response(
       jsonEncode({'success': true, 'data': data}),

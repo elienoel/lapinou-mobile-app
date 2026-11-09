@@ -1,5 +1,6 @@
+import '../utils/formatters.dart';
+import 'app_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/care.dart';
 import '../models/rabbit.dart';
@@ -137,159 +138,127 @@ class _CareTreatmentSheetState extends State<CareTreatmentSheet> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.existing != null;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return SheetBody(
+      children: [
+        Text(
+          isEdit ? 'Modifier le type de soin' : 'Nouveau type de soin',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          key: const ValueKey('treatment-name'),
+          controller: _name,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Nom du soin',
+            hintText: 'Vaccin VHD2, Vitamine ADE, Ivermectine…',
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'Famille',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            Text(
-              isEdit ? 'Modifier le type de soin' : 'Nouveau type de soin',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              key: const ValueKey('treatment-name'),
-              controller: _name,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Nom du soin',
-                hintText: 'Vaccin VHD2, Vitamine ADE, Ivermectine…',
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Famille',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final c in CareCategory.values)
-                  ChoiceChip(
-                    key: ValueKey('treatment-category-${c.apiValue}'),
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CareCategoryIcon(
-                          c,
-                          size: 16,
-                          color:
-                              _category == c
-                                  ? Colors.white
-                                  : AppColors.textPrimary,
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(c.label, overflow: TextOverflow.ellipsis),
-                        ),
-                      ],
-                    ),
-                    selected: _category == c,
-                    selectedColor: AppColors.primary,
-                    checkmarkColor: Colors.white,
-                    labelStyle: TextStyle(
+            for (final c in CareCategory.values)
+              ChoiceChip(
+                key: ValueKey('treatment-category-${c.apiValue}'),
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CareCategoryIcon(
+                      c,
+                      size: 16,
                       color:
                           _category == c ? Colors.white : AppColors.textPrimary,
                     ),
-                    onSelected: (_) => setState(() => _category = c),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Durée avant renouvellement',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final (label, days) in _presets)
-                  ChoiceChip(
-                    key: ValueKey('treatment-preset-${days ?? 'none'}'),
-                    label: Text(label),
-                    selected: _renewalDays == days,
-                    selectedColor: AppColors.primary,
-                    checkmarkColor: Colors.white,
-                    labelStyle: TextStyle(
-                      color:
-                          _renewalDays == days
-                              ? Colors.white
-                              : AppColors.textPrimary,
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(c.label, overflow: TextOverflow.ellipsis),
                     ),
-                    onSelected:
-                        (_) =>
-                            setState(() => _days.text = days?.toString() ?? ''),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              key: const ValueKey('treatment-days'),
-              controller: _days,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'Jours avant le prochain soin',
-                helperText:
-                    'Laissez vide pour un soin ponctuel (aucun rappel).',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey('treatment-notes'),
-              controller: _notes,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Notes (produit, dosage…)',
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                key: const ValueKey('treatment-error'),
-                style: TextStyle(
-                  color: Colors.red.shade700,
-                  fontWeight: FontWeight.w600,
+                  ],
                 ),
+                selected: _category == c,
+                selectedColor: AppColors.primary,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: _category == c ? Colors.white : AppColors.textPrimary,
+                ),
+                onSelected: (_) => setState(() => _category = c),
               ),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                key: const ValueKey('treatment-submit'),
-                onPressed: _saving ? null : _submit,
-                child:
-                    _saving
-                        ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : Text(
-                          isEdit ? 'Enregistrer' : 'Créer le type de soin',
-                        ),
-              ),
-            ),
           ],
         ),
-      ),
+        const SizedBox(height: 14),
+        const Text(
+          'Durée avant renouvellement',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final (label, days) in _presets)
+              ChoiceChip(
+                key: ValueKey('treatment-preset-${days ?? 'none'}'),
+                label: Text(label),
+                selected: _renewalDays == days,
+                selectedColor: AppColors.primary,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color:
+                      _renewalDays == days
+                          ? Colors.white
+                          : AppColors.textPrimary,
+                ),
+                onSelected:
+                    (_) => setState(() => _days.text = days?.toString() ?? ''),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          key: const ValueKey('treatment-days'),
+          controller: _days,
+          keyboardType: TextInputType.number,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'Jours avant le prochain soin',
+            helperText: 'Laissez vide pour un soin ponctuel (aucun rappel).',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('treatment-notes'),
+          controller: _notes,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            labelText: 'Notes (produit, dosage…)',
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _error!,
+            key: const ValueKey('treatment-error'),
+            style: TextStyle(
+              color: Colors.red.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        SubmitButton(
+          key: const ValueKey('treatment-submit'),
+          label: isEdit ? 'Enregistrer' : 'Créer le type de soin',
+          saving: _saving,
+          onPressed: _submit,
+        ),
+      ],
     );
   }
 }
@@ -438,257 +407,226 @@ class _CareRecordSheetState extends State<CareRecordSheet> {
               _date.day + treatment!.renewalDays!,
             );
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isEdit ? 'Modifier le soin' : 'Enregistrer un soin',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 16),
-            if (treatments.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.statusPregnantBg,
-                  border: Border.all(color: AppColors.statusPregnantText),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Créez d\'abord un type de soin (vaccin, vitamine…).',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    TextButton(
-                      key: const ValueKey('record-new-treatment'),
-                      onPressed: _newTreatment,
-                      child: const Text('Créer'),
-                    ),
-                  ],
-                ),
-              )
-            else ...[
-              DropdownButtonFormField<String>(
-                key: const ValueKey('record-treatment'),
-                value: _treatmentId,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Type de soin'),
-                items: [
-                  for (final t in treatments)
-                    DropdownMenuItem(
-                      value: t.id,
-                      child: Row(
-                        children: [
-                          CareCategoryIcon(
-                            t.category,
-                            size: 18,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              t.name,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-                onChanged: (v) => setState(() => _treatmentId = v),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  key: const ValueKey('record-new-treatment'),
-                  onPressed: _newTreatment,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Nouveau type de soin'),
-                ),
-              ),
-            ],
-            const SizedBox(height: 4),
-            InkWell(
-              key: const ValueKey('record-date'),
-              onTap: _pickDate,
+    return SheetBody(
+      children: [
+        Text(
+          isEdit ? 'Modifier le soin' : 'Enregistrer un soin',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 16),
+        if (treatments.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.statusPregnantBg,
+              border: Border.all(color: AppColors.statusPregnantText),
               borderRadius: BorderRadius.circular(12),
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Date du soin',
-                  prefixIcon: Icon(Icons.event_outlined, size: 20),
-                ),
-                child: Text(DateFormat('dd/MM/yyyy').format(_date)),
-              ),
             ),
-            if (treatment != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                nextDue == null
-                    ? 'Soin ponctuel : aucun rappel.'
-                    : '${renewalLabel(treatment.renewalDays)} · prochain soin le '
-                        '${DateFormat('dd/MM/yyyy').format(nextDue)}',
-                key: const ValueKey('record-next-due'),
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey('record-purpose'),
-              controller: _purpose,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Pour quel motif ?',
-                hintText: 'Prévention VHD, toux, gale des oreilles…',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
+            child: Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Text(
-                    'Lapins soignés (${_rabbitIds.length})',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
+                    'Créez d\'abord un type de soin (vaccin, vitamine…).',
+                    style: TextStyle(fontSize: 13),
                   ),
                 ),
                 TextButton(
-                  key: const ValueKey('record-select-all'),
-                  onPressed:
-                      () => setState(
-                        () => _rabbitIds.addAll(rabbits.map((r) => r.id)),
-                      ),
-                  child: const Text('Tous'),
-                ),
-                TextButton(
-                  key: const ValueKey('record-select-none'),
-                  onPressed: () => setState(_rabbitIds.clear),
-                  child: const Text('Aucun'),
+                  key: const ValueKey('record-new-treatment'),
+                  onPressed: _newTreatment,
+                  child: const Text('Créer'),
                 ),
               ],
             ),
-            if (provider.rabbits.length > 6)
-              TextField(
-                key: const ValueKey('record-search'),
-                controller: _search,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText: 'Rechercher un lapin (nom ou bague)',
-                  prefixIcon: Icon(Icons.search, size: 20),
-                  isDense: true,
-                ),
-              ),
-            const SizedBox(height: 6),
-            if (rabbits.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Aucun lapin à afficher.',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              )
-            else
-              Container(
-                constraints: const BoxConstraints(maxHeight: 250),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundGrey,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: rabbits.length,
-                  itemBuilder: (context, i) {
-                    final r = rabbits[i];
-                    return CheckboxListTile(
-                      key: ValueKey('record-rabbit-${r.id}'),
-                      dense: true,
-                      activeColor: AppColors.primary,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      value: _rabbitIds.contains(r.id),
-                      title: Text(
-                        '${r.gender == RabbitGender.male ? '♂' : '♀'} ${r.name}',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+          )
+        else ...[
+          DropdownButtonFormField<String>(
+            key: const ValueKey('record-treatment'),
+            value: _treatmentId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Type de soin'),
+            items: [
+              for (final t in treatments)
+                DropdownMenuItem(
+                  value: t.id,
+                  child: Row(
+                    children: [
+                      CareCategoryIcon(
+                        t.category,
+                        size: 18,
+                        color: AppColors.primary,
                       ),
-                      subtitle: Text(
-                        'Bague ${r.tagNumber}',
-                        style: const TextStyle(fontSize: 11.5),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(t.name, overflow: TextOverflow.ellipsis),
                       ),
-                      onChanged:
-                          (v) => setState(() {
-                            if (v == true) {
-                              _rabbitIds.add(r.id);
-                            } else {
-                              _rabbitIds.remove(r.id);
-                            }
-                          }),
-                    );
-                  },
+                    ],
+                  ),
                 ),
-              ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey('record-notes'),
-              controller: _notes,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Notes (dosage, produit, observations…)',
+            ],
+            onChanged: (v) => setState(() => _treatmentId = v),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const ValueKey('record-new-treatment'),
+              onPressed: _newTreatment,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Nouveau type de soin'),
+            ),
+          ),
+        ],
+        const SizedBox(height: 4),
+        InkWell(
+          key: const ValueKey('record-date'),
+          onTap: _pickDate,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Date du soin',
+              prefixIcon: Icon(Icons.event_outlined, size: 20),
+            ),
+            child: Text(formatDate(_date)),
+          ),
+        ),
+        if (treatment != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            nextDue == null
+                ? 'Soin ponctuel : aucun rappel.'
+                : '${renewalLabel(treatment.renewalDays)} · prochain soin le '
+                    '${formatDate(nextDue)}',
+            key: const ValueKey('record-next-due'),
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('record-purpose'),
+          controller: _purpose,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Pour quel motif ?',
+            hintText: 'Prévention VHD, toux, gale des oreilles…',
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Lapins soignés (${_rabbitIds.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
               ),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                key: const ValueKey('record-error'),
-                style: TextStyle(
-                  color: Colors.red.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                key: const ValueKey('record-submit'),
-                onPressed: _saving ? null : _submit,
-                child:
-                    _saving
-                        ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : Text(
-                          isEdit
-                              ? 'Enregistrer les modifications'
-                              : 'Enregistrer le soin',
-                        ),
-              ),
+            TextButton(
+              key: const ValueKey('record-select-all'),
+              onPressed:
+                  () => setState(
+                    () => _rabbitIds.addAll(rabbits.map((r) => r.id)),
+                  ),
+              child: const Text('Tous'),
+            ),
+            TextButton(
+              key: const ValueKey('record-select-none'),
+              onPressed: () => setState(_rabbitIds.clear),
+              child: const Text('Aucun'),
             ),
           ],
         ),
-      ),
+        if (provider.rabbits.length > 6)
+          TextField(
+            key: const ValueKey('record-search'),
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              hintText: 'Rechercher un lapin (nom ou bague)',
+              prefixIcon: Icon(Icons.search, size: 20),
+              isDense: true,
+            ),
+          ),
+        const SizedBox(height: 6),
+        if (rabbits.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Aucun lapin à afficher.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          )
+        else
+          Container(
+            constraints: const BoxConstraints(maxHeight: 250),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundGrey,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: rabbits.length,
+              itemBuilder: (context, i) {
+                final r = rabbits[i];
+                return CheckboxListTile(
+                  key: ValueKey('record-rabbit-${r.id}'),
+                  dense: true,
+                  activeColor: AppColors.primary,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: _rabbitIds.contains(r.id),
+                  title: Text(
+                    '${r.gender == RabbitGender.male ? '♂' : '♀'} ${r.name}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    'Bague ${r.tagNumber}',
+                    style: const TextStyle(fontSize: 11.5),
+                  ),
+                  onChanged:
+                      (v) => setState(() {
+                        if (v == true) {
+                          _rabbitIds.add(r.id);
+                        } else {
+                          _rabbitIds.remove(r.id);
+                        }
+                      }),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('record-notes'),
+          controller: _notes,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            labelText: 'Notes (dosage, produit, observations…)',
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _error!,
+            key: const ValueKey('record-error'),
+            style: TextStyle(
+              color: Colors.red.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        SubmitButton(
+          key: const ValueKey('record-submit'),
+          label:
+              isEdit ? 'Enregistrer les modifications' : 'Enregistrer le soin',
+          saving: _saving,
+          onPressed: _submit,
+        ),
+      ],
     );
   }
 }

@@ -6,17 +6,16 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lapinou/services/connectivity_service.dart';
-import 'package:lapinou/services/sync_service.dart';
-import 'package:lapinou/services/local_database.dart';
-import 'package:lapinou/models/cage.dart';
-import 'package:lapinou/models/rabbit.dart';
-import 'package:lapinou/widgets/app_icon.dart';
-import 'package:lapinou/providers/auth_provider.dart';
-import 'package:lapinou/providers/rabbit_provider.dart';
-import 'package:lapinou/screens/add_rabbit_screen.dart';
-import 'package:lapinou/screens/cages_screen.dart';
-import 'package:lapinou/widgets/cage_diagram.dart';
+import 'package:clap_in/services/connectivity_service.dart';
+import 'package:clap_in/services/local_database.dart';
+import 'package:clap_in/models/cage.dart';
+import 'package:clap_in/models/rabbit.dart';
+import 'package:clap_in/widgets/app_icon.dart';
+import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/rabbit_provider.dart';
+import 'package:clap_in/screens/add_rabbit_screen.dart';
+import 'package:clap_in/screens/cages_screen.dart';
+import 'package:clap_in/widgets/cage_diagram.dart';
 
 Map<String, dynamic> _rabbit(int id, String name, {String gender = 'F'}) => {
       'id': id,

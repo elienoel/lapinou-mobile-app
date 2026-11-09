@@ -1,10 +1,10 @@
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/pharmacy.dart';
 import '../providers/auth_provider.dart';
 import '../providers/pharmacy_provider.dart';
 import '../theme/colors.dart';
-import '../theme/radius.dart';
 import 'medication_detail_screen.dart';
 
 /// Fiche d'une pharmacie : adresse/téléphone puis la liste de ses médicaments
@@ -71,11 +71,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppRadius.card),
-                        border: Border.all(color: AppColors.cardBorder),
-                      ),
+                      decoration: appCardDecoration(),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -144,11 +140,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
                       for (final line in pharmacy.medications)
                         Container(
                           margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(AppRadius.card),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
+                          decoration: appCardDecoration(),
                           child: ListTile(
                             leading: ClipRRect(
                               borderRadius: BorderRadius.circular(8),

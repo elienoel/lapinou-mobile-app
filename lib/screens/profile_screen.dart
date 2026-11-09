@@ -1,3 +1,4 @@
+import '../widgets/app_ui.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -60,12 +61,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _email.text = user.email ?? '';
     _bio.text = user.bio ?? '';
     _loadedForUserId = user.id;
-  }
-
-  void _toast(String message, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
-    );
   }
 
   // ---- Photo de profil ----
@@ -137,12 +132,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       setState(() => _isUploadingPhoto = false);
       error == null
-          ? _toast('Photo de profil mise à jour')
-          : _toast(error, error: true);
+          ? showAppSnack(context, 'Photo de profil mise à jour')
+          : showAppSnack(context, error, error: true);
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingPhoto = false);
-        _toast("Impossible d'accéder à la photo.", error: true);
+        showAppSnack(context, "Impossible d'accéder à la photo.", error: true);
       }
     }
   }
@@ -152,7 +147,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final error = await context.read<AuthProvider>().removeAvatar();
     if (!mounted) return;
     setState(() => _isUploadingPhoto = false);
-    error == null ? _toast('Photo supprimée') : _toast(error, error: true);
+    error == null
+        ? showAppSnack(context, 'Photo supprimée')
+        : showAppSnack(context, error, error: true);
   }
 
   // ---- Informations ----
@@ -175,7 +172,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _isSaving = false;
       if (error == null) _isEditing = false;
     });
-    error == null ? _toast('Profil enregistré') : _toast(error, error: true);
+    error == null
+        ? showAppSnack(context, 'Profil enregistré')
+        : showAppSnack(context, error, error: true);
   }
 
   void _startEditing(AuthUser user) {
@@ -194,35 +193,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _confirmLogout() async {
     final pending = context.read<SyncService>().pendingCount;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Déconnexion'),
-            content: Text(
-              pending > 0
-                  ? 'Voulez-vous vraiment vous déconnecter ?\n\n'
-                      '$pending modification${pending > 1 ? 's' : ''} ne '
-                      "${pending > 1 ? 'sont' : 'est'} pas encore synchronisée${pending > 1 ? 's' : ''}. "
-                      'Elle${pending > 1 ? 's seront' : ' sera'} envoyée${pending > 1 ? 's' : ''} '
-                      "à la prochaine connexion à ce compte."
-                  : 'Voulez-vous vraiment vous déconnecter ?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annuler'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Déconnexion'),
-              ),
-            ],
-          ),
+    final ok = await confirmAction(
+      context,
+      title: 'Déconnexion',
+      message:
+          pending > 0
+              ? 'Voulez-vous vraiment vous déconnecter ?\n\n'
+                  '$pending modification${pending > 1 ? 's' : ''} ne '
+                  "${pending > 1 ? 'sont' : 'est'} pas encore synchronisée${pending > 1 ? 's' : ''}. "
+                  'Elle${pending > 1 ? 's seront' : ' sera'} envoyée${pending > 1 ? 's' : ''} '
+                  "à la prochaine connexion à ce compte."
+              : 'Voulez-vous vraiment vous déconnecter ?',
+      confirmLabel: 'Déconnexion',
     );
     if (ok == true && mounted) context.read<AuthProvider>().logout();
   }
@@ -236,7 +218,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final error = await context.read<AuthProvider>().deleteAccount();
     if (!mounted) return;
-    if (error != null) _toast(error, error: true);
+    if (error != null) showAppSnack(context, error, error: true);
     // En cas de succès, la session est fermée et l'écran de connexion s'affiche
   }
 
@@ -677,7 +659,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           Row(
             children: [
-              Expanded(child: row(Icons.person_outline, 'Prénom', user.firstName)),
+              Expanded(
+                child: row(Icons.person_outline, 'Prénom', user.firstName),
+              ),
               Expanded(child: row(Icons.badge_outlined, 'Nom', user.lastName)),
             ],
           ),

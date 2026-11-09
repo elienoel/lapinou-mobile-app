@@ -3,17 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lapinou/models/rabbit.dart';
-import 'package:lapinou/models/mating.dart';
-import 'package:lapinou/models/litter.dart';
-import 'package:lapinou/providers/pharmacy_provider.dart';
-import 'package:lapinou/providers/rabbit_provider.dart';
-import 'package:lapinou/providers/auth_provider.dart';
-import 'package:lapinou/providers/community_provider.dart';
-import 'package:lapinou/providers/chat_provider.dart';
-import 'package:lapinou/screens/home_dashboard_screen.dart';
-import 'package:lapinou/screens/main_navigation_screen.dart';
-import 'package:lapinou/screens/profile_screen.dart';
+import 'package:clap_in/models/rabbit.dart';
+import 'package:clap_in/models/mating.dart';
+import 'package:clap_in/models/litter.dart';
+import 'package:clap_in/providers/pharmacy_provider.dart';
+import 'package:clap_in/providers/rabbit_provider.dart';
+import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/community_provider.dart';
+import 'package:clap_in/providers/chat_provider.dart';
+import 'package:clap_in/screens/home_dashboard_screen.dart';
+import 'package:clap_in/screens/main_navigation_screen.dart';
+import 'package:clap_in/screens/profile_screen.dart';
 
 void main() {
   setUpAll(() async {

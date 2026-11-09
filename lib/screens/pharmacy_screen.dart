@@ -283,7 +283,7 @@ class _PharmacyMapTabState extends State<_PharmacyMapTab> {
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.lapinou.app',
+              userAgentPackageName: 'dev.clapin.elienoel',
             ),
             MarkerLayer(
               markers: [

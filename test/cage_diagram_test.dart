@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lapinou/models/cage.dart';
-import 'package:lapinou/models/rabbit.dart';
-import 'package:lapinou/widgets/cage_diagram.dart';
+import 'package:clap_in/models/cage.dart';
+import 'package:clap_in/models/rabbit.dart';
+import 'package:clap_in/widgets/cage_diagram.dart';
 
 Cage _cage(
   int count, {

@@ -6,7 +6,10 @@ import '../theme/colors.dart';
 
 /// Bouton « Messages » avec la pastille des messages non lus.
 class ChatIconButton extends StatelessWidget {
-  const ChatIconButton({super.key});
+  const ChatIconButton({super.key, this.color = AppColors.primary});
+
+  /// Couleur de l'icône (blanc sur un fond sombre comme le bandeau d'accueil)
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -16,11 +19,8 @@ class ChatIconButton extends StatelessWidget {
       icon: Badge(
         isLabelVisible: unread > 0,
         label: Text(unread > 99 ? '99+' : '$unread'),
-        backgroundColor: AppColors.primary,
-        child: const Icon(
-          Icons.chat_bubble_outline_rounded,
-          color: AppColors.primary,
-        ),
+        backgroundColor: AppColors.secondary,
+        child: Icon(Icons.chat_bubble_outline_rounded, color: color),
       ),
       onPressed:
           () => Navigator.push(

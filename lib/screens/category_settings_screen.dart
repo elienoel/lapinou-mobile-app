@@ -1,10 +1,10 @@
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/finance_transaction.dart';
 import '../providers/category_provider.dart';
 import '../theme/colors.dart';
-import '../theme/radius.dart';
 
 /// Gestion des catégories de dépenses et de revenus utilisées dans le formulaire
 /// de transaction (module Finances).
@@ -54,29 +54,12 @@ class CategorySettingsScreen extends StatelessWidget {
     String label,
   ) async {
     final categories = context.read<CategoryProvider>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Supprimer cette catégorie ?'),
-            content: Text(
-              '« $label » ne sera plus proposée dans le formulaire. Les transactions '
-              'déjà enregistrées avec cette catégorie ne sont pas modifiées.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annuler'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Supprimer',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
-          ),
+    final confirmed = await confirmAction(
+      context,
+      title: 'Supprimer cette catégorie ?',
+      message:
+          '« $label » ne sera plus proposée dans le formulaire. Les transactions '
+          'déjà enregistrées avec cette catégorie ne sont pas modifiées.',
     );
     if (confirmed == true) {
       await categories.removeCategory(type, label);
@@ -150,11 +133,7 @@ class CategorySettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
+          decoration: appCardDecoration(),
           child: Column(
             children: [
               for (int i = 0; i < items.length; i++) ...[

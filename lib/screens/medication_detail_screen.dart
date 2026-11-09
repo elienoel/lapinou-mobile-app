@@ -1,3 +1,4 @@
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/currency.dart';
@@ -130,11 +131,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                       for (final pharmacy in medication.pharmacies)
                         Container(
                           margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(AppRadius.card),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
+                          decoration: appCardDecoration(),
                           child: ListTile(
                             leading: const Icon(
                               Icons.local_pharmacy_outlined,

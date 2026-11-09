@@ -1,3 +1,4 @@
+import 'app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/community_post.dart';
@@ -82,7 +83,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
   Future<void> _react(PostComment comment, String emoji) async {
     final token = context.read<AuthProvider>().token;
     if (token == null || token.isEmpty) {
-      _toast('Veuillez vous connecter pour réagir');
+      showAppSnack(context, 'Veuillez vous connecter pour réagir');
       return;
     }
     final provider = context.read<CommunityProvider>();
@@ -95,7 +96,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
     final ok = await future;
     if (!mounted) return;
     setState(() {});
-    if (!ok) _toast('Impossible d\'enregistrer la réaction');
+    if (!ok) showAppSnack(context, 'Impossible d\'enregistrer la réaction');
   }
 
   Future<void> _send() async {
@@ -104,7 +105,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
 
     final token = context.read<AuthProvider>().token;
     if (token == null || token.isEmpty) {
-      _toast('Veuillez vous connecter pour commenter');
+      showAppSnack(context, 'Veuillez vous connecter pour commenter');
       return;
     }
 
@@ -123,7 +124,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
 
     setState(() => _isSending = false);
     if (comment == null) {
-      _toast('Erreur lors de l\'envoi du commentaire');
+      showAppSnack(context, 'Erreur lors de l\'envoi du commentaire');
       return;
     }
     _controller.clear();
@@ -132,12 +133,6 @@ class _CommentsSheetState extends State<CommentsSheet> {
       _replyingTo = null;
       if (rootId != null) _expandedThreads.add(rootId);
     });
-  }
-
-  void _toast(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -211,7 +206,11 @@ class _CommentsSheetState extends State<CommentsSheet> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline, size: 36, color: AppColors.textSecondary),
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 36,
+            color: AppColors.textSecondary,
+          ),
           SizedBox(height: 8),
           Text(
             'Aucun commentaire pour le moment',

@@ -9,7 +9,7 @@ import 'api_constants.dart';
 /// Détecte le retour de connexion pour déclencher la synchronisation automatique.
 ///
 /// `connectivity_plus` indique seulement qu'une interface réseau est active (wifi,
-/// données mobiles) : ça ne garantit pas que le serveur Lapinou est joignable
+/// données mobiles) : ça ne garantit pas que le serveur Clap'in est joignable
 /// (wifi sans internet, portail captif, DNS/TLS cassé sur ce domaine précis...),
 /// donc on vérifie en plus une requête HTTP réelle vers l'API avant de considérer
 /// l'appareil comme réellement en ligne. Toute réponse HTTP (même une erreur

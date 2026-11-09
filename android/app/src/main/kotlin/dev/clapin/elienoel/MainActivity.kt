@@ -1,4 +1,4 @@
-package com.lapinou.app.lapinou
+package dev.clapin.elienoel
 
 import io.flutter.embedding.android.FlutterActivity
 

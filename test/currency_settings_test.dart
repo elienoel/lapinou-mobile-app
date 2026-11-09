@@ -6,15 +6,15 @@ import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lapinou/services/connectivity_service.dart';
-import 'package:lapinou/models/currency.dart';
-import 'package:lapinou/providers/auth_provider.dart';
-import 'package:lapinou/providers/rabbit_provider.dart';
-import 'package:lapinou/screens/currency_settings_screen.dart';
-import 'package:lapinou/screens/finances_screen.dart';
-import 'package:lapinou/screens/profile_screen.dart';
-import 'package:lapinou/screens/settings_screen.dart';
-import 'package:lapinou/services/sync_service.dart';
+import 'package:clap_in/services/connectivity_service.dart';
+import 'package:clap_in/models/currency.dart';
+import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/rabbit_provider.dart';
+import 'package:clap_in/screens/currency_settings_screen.dart';
+import 'package:clap_in/screens/finances_screen.dart';
+import 'package:clap_in/screens/profile_screen.dart';
+import 'package:clap_in/screens/settings_screen.dart';
+import 'package:clap_in/services/sync_service.dart';
 
 // L'espace fine insécable que intl utilise comme séparateur de milliers en français
 const _nnbsp = ' ';

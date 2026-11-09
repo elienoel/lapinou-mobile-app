@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lapinou/services/local_database.dart';
-import 'package:lapinou/services/sync_service.dart';
+import 'package:clap_in/services/local_database.dart';
+import 'package:clap_in/services/sync_service.dart';
 
 final _uuid = RegExp(
   r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',

@@ -7,13 +7,13 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lapinou/services/connectivity_service.dart';
-import 'package:lapinou/models/finance_period.dart';
-import 'package:lapinou/models/finance_transaction.dart';
-import 'package:lapinou/providers/auth_provider.dart';
-import 'package:lapinou/providers/category_provider.dart';
-import 'package:lapinou/providers/rabbit_provider.dart';
-import 'package:lapinou/screens/finances_screen.dart';
+import 'package:clap_in/services/connectivity_service.dart';
+import 'package:clap_in/models/finance_period.dart';
+import 'package:clap_in/models/finance_transaction.dart';
+import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/category_provider.dart';
+import 'package:clap_in/providers/rabbit_provider.dart';
+import 'package:clap_in/screens/finances_screen.dart';
 
 FinanceTransaction _tx(
   String id,

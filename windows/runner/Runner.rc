@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.lapinou.app" "\0"
-            VALUE "FileDescription", "lapinou" "\0"
+            VALUE "CompanyName", "dev.clapin.elienoel" "\0"
+            VALUE "FileDescription", "Clap'in" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "lapinou" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.lapinou.app. All rights reserved." "\0"
-            VALUE "OriginalFilename", "lapinou.exe" "\0"
-            VALUE "ProductName", "lapinou" "\0"
+            VALUE "InternalName", "clap-in" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 dev.clapin.elienoel. All rights reserved." "\0"
+            VALUE "OriginalFilename", "clap-in.exe" "\0"
+            VALUE "ProductName", "Clap'in" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Lapinou</string>
+	<string>Clap&apos;in</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>lapinou</string>
+	<string>clap-in</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -46,12 +46,12 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Lapinou a besoin d'accéder à l'appareil photo pour vous permettre de prendre des photos de vos lapins ou publications.</string>
+	<string>Clap&apos;in a besoin d'accéder à l'appareil photo pour vous permettre de prendre des photos de vos lapins ou publications.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Lapinou a besoin d'accéder à votre galerie pour ajouter des photos et vidéos à vos publications.</string>
+	<string>Clap&apos;in a besoin d'accéder à votre galerie pour ajouter des photos et vidéos à vos publications.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Lapinou a besoin d'accéder au micro pour vous permettre d'enregistrer des notes vocales.</string>
+	<string>Clap&apos;in a besoin d'accéder au micro pour vous permettre d'enregistrer des notes vocales.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Lapinou a besoin de votre position pour afficher les pharmacies les plus proches de vous sur la carte.</string>
+	<string>Clap&apos;in a besoin de votre position pour afficher les pharmacies les plus proches de vous sur la carte.</string>
 </dict>
 </plist>

@@ -161,12 +161,22 @@ class RabbitProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 1. Lapins (CRUD) — disponible hors-ligne : lecture et écriture passent par la
-  /// base locale, la synchronisation avec le serveur se fait en tâche de fond dès
-  /// qu'une connexion est disponible (voir [SyncService]).
-  Future<void> fetchRabbits({String? token}) async {
-    final local = await LocalDatabase.instance.getAll(SyncEntity.rabbit);
-    _rabbits = local.map((r) => Rabbit.fromJson(r.data)).toList();
+  /// Charge une liste depuis la base locale (affichage immédiat, hors-ligne compris), puis,
+  /// si le serveur est joignable, la remplace par les données serveur et relit la base.
+  Future<void> _syncFromServer<T>({
+    required SyncEntity entity,
+    required String url,
+    required T Function(Map<String, dynamic>) fromJson,
+    required void Function(List<T>) assign,
+    required String label,
+    String? token,
+  }) async {
+    Future<List<T>> readLocal() async {
+      final rows = await LocalDatabase.instance.getAll(entity);
+      return rows.map((r) => fromJson(r.data)).toList();
+    }
+
+    assign(await readLocal());
     notifyListeners();
 
     final t = token ?? _token;
@@ -174,29 +184,34 @@ class RabbitProvider extends ChangeNotifier {
     if (!await ConnectivityService.instance.isOnline()) return;
 
     try {
-      final response = await http.get(
-        Uri.parse(ApiConstants.rabbitsUrl),
-        headers: _headers(t),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final List list =
-            body['data'] is List
-                ? body['data']
-                : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(SyncEntity.rabbit, [
-          for (final item in list) Map<String, dynamic>.from(item),
-        ]);
-        final refreshed = await LocalDatabase.instance.getAll(
-          SyncEntity.rabbit,
-        );
-        _rabbits = refreshed.map((r) => Rabbit.fromJson(r.data)).toList();
-        notifyListeners();
-      }
+      final response = await http.get(Uri.parse(url), headers: _headers(t));
+      if (response.statusCode != 200) return;
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      final List list =
+          body['data'] is List
+              ? body['data']
+              : (body['results'] is List ? body['results'] : []);
+      await LocalDatabase.instance.replaceFromServer(entity, [
+        for (final item in list) Map<String, dynamic>.from(item),
+      ]);
+      assign(await readLocal());
+      notifyListeners();
     } catch (e) {
-      debugPrint('Error fetching rabbits: $e');
+      debugPrint('Error fetching $label: $e');
     }
   }
+
+  /// 1. Lapins (CRUD) — disponible hors-ligne : lecture et écriture passent par la
+  /// base locale, la synchronisation avec le serveur se fait en tâche de fond dès
+  /// qu'une connexion est disponible (voir [SyncService]).
+  Future<void> fetchRabbits({String? token}) => _syncFromServer<Rabbit>(
+    entity: SyncEntity.rabbit,
+    url: ApiConstants.rabbitsUrl,
+    fromJson: Rabbit.fromJson,
+    assign: (list) => _rabbits = list,
+    label: 'rabbits',
+    token: token,
+  );
 
   Future<bool> addRabbit(
     Rabbit rabbit, {
@@ -438,34 +453,14 @@ class RabbitProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchCages({String? token}) async {
-    final local = await LocalDatabase.instance.getAll(SyncEntity.cage);
-    _cages = local.map((c) => Cage.fromJson(c.data)).toList();
-    notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return;
-    if (!await ConnectivityService.instance.isOnline()) return;
-
-    try {
-      final response = await http.get(
-        Uri.parse('${ApiConstants.cagesUrl}?all=true'),
-        headers: _headers(t),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final List list = body['data'] is List ? body['data'] : [];
-        await LocalDatabase.instance.replaceFromServer(SyncEntity.cage, [
-          for (final item in list) Map<String, dynamic>.from(item),
-        ]);
-        final refreshed = await LocalDatabase.instance.getAll(SyncEntity.cage);
-        _cages = refreshed.map((c) => Cage.fromJson(c.data)).toList();
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error fetching cages: $e');
-    }
-  }
+  Future<void> fetchCages({String? token}) => _syncFromServer<Cage>(
+    entity: SyncEntity.cage,
+    url: '${ApiConstants.cagesUrl}?all=true',
+    fromJson: Cage.fromJson,
+    assign: (list) => _cages = list,
+    label: 'cages',
+    token: token,
+  );
 
   /// Crée ou modifie les attributs d'une cage (nom, taille, emplacement). Fonctionne
   /// hors-ligne ; l'occupation détaillée des loges (calculée par le serveur) ne se
@@ -584,39 +579,14 @@ class RabbitProvider extends ChangeNotifier {
   }
 
   /// 2. Accouplements (Saillies)
-  Future<void> fetchMatings({String? token}) async {
-    final local = await LocalDatabase.instance.getAll(SyncEntity.mating);
-    _matings = local.map((m) => Mating.fromJson(m.data)).toList();
-    notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return;
-    if (!await ConnectivityService.instance.isOnline()) return;
-
-    try {
-      final response = await http.get(
-        Uri.parse(ApiConstants.matingsUrl),
-        headers: _headers(t),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final List list =
-            body['data'] is List
-                ? body['data']
-                : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(SyncEntity.mating, [
-          for (final item in list) Map<String, dynamic>.from(item),
-        ]);
-        final refreshed = await LocalDatabase.instance.getAll(
-          SyncEntity.mating,
-        );
-        _matings = refreshed.map((m) => Mating.fromJson(m.data)).toList();
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error fetching matings: $e');
-    }
-  }
+  Future<void> fetchMatings({String? token}) => _syncFromServer<Mating>(
+    entity: SyncEntity.mating,
+    url: ApiConstants.matingsUrl,
+    fromJson: Mating.fromJson,
+    assign: (list) => _matings = list,
+    label: 'matings',
+    token: token,
+  );
 
   Future<bool> addMating(Mating mating, {String? token}) async {
     _matings.insert(0, mating);
@@ -767,39 +737,14 @@ class RabbitProvider extends ChangeNotifier {
   }
 
   /// 3. Mises bas (Portées)
-  Future<void> fetchLitters({String? token}) async {
-    final local = await LocalDatabase.instance.getAll(SyncEntity.litter);
-    _litters = local.map((l) => Litter.fromJson(l.data)).toList();
-    notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return;
-    if (!await ConnectivityService.instance.isOnline()) return;
-
-    try {
-      final response = await http.get(
-        Uri.parse(ApiConstants.littersUrl),
-        headers: _headers(t),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final List list =
-            body['data'] is List
-                ? body['data']
-                : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(SyncEntity.litter, [
-          for (final item in list) Map<String, dynamic>.from(item),
-        ]);
-        final refreshed = await LocalDatabase.instance.getAll(
-          SyncEntity.litter,
-        );
-        _litters = refreshed.map((l) => Litter.fromJson(l.data)).toList();
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error fetching litters: $e');
-    }
-  }
+  Future<void> fetchLitters({String? token}) => _syncFromServer<Litter>(
+    entity: SyncEntity.litter,
+    url: ApiConstants.littersUrl,
+    fromJson: Litter.fromJson,
+    assign: (list) => _litters = list,
+    label: 'litters',
+    token: token,
+  );
 
   /// Renvoie null si la mise bas est enregistrée, sinon le motif du refus.
   Future<String?> addLitter(Litter litter, {String? token}) async {
@@ -946,39 +891,14 @@ class RabbitProvider extends ChangeNotifier {
   }
 
   /// 4. Soins et Vaccinations
-  Future<void> fetchCareEvents({String? token}) async {
-    final local = await LocalDatabase.instance.getAll(SyncEntity.careEvent);
-    _careEvents = local.map((c) => CareEvent.fromJson(c.data)).toList();
-    notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return;
-    if (!await ConnectivityService.instance.isOnline()) return;
-
-    try {
-      final response = await http.get(
-        Uri.parse(ApiConstants.careEventsUrl),
-        headers: _headers(t),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final List list =
-            body['data'] is List
-                ? body['data']
-                : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(SyncEntity.careEvent, [
-          for (final item in list) Map<String, dynamic>.from(item),
-        ]);
-        final refreshed = await LocalDatabase.instance.getAll(
-          SyncEntity.careEvent,
-        );
-        _careEvents = refreshed.map((c) => CareEvent.fromJson(c.data)).toList();
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error fetching care events: $e');
-    }
-  }
+  Future<void> fetchCareEvents({String? token}) => _syncFromServer<CareEvent>(
+    entity: SyncEntity.careEvent,
+    url: ApiConstants.careEventsUrl,
+    fromJson: CareEvent.fromJson,
+    assign: (list) => _careEvents = list,
+    label: 'care events',
+    token: token,
+  );
 
   Future<bool> addCareEvent(CareEvent event, {String? token}) async {
     _careEvents.insert(0, event);
@@ -1130,9 +1050,11 @@ class RabbitProvider extends ChangeNotifier {
     String? token,
   }) async {
     final today = DateTime.now();
-    if (DateTime(date.year, date.month, date.day).isAfter(
-      DateTime(today.year, today.month, today.day),
-    )) {
+    if (DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).isAfter(DateTime(today.year, today.month, today.day))) {
       return 'Un soin effectué ne peut pas être daté dans le futur.';
     }
     if (rabbitIds.isEmpty) return 'Sélectionnez au moins un lapin soigné.';
@@ -1171,41 +1093,15 @@ class RabbitProvider extends ChangeNotifier {
   }
 
   /// 5. Finances
-  Future<void> fetchFinances({String? token}) async {
-    final local = await LocalDatabase.instance.getAll(SyncEntity.finance);
-    _finances = local.map((f) => FinanceTransaction.fromJson(f.data)).toList();
-    notifyListeners();
-
-    final t = token ?? _token;
-    if (t == null || t.isEmpty) return;
-    if (!await ConnectivityService.instance.isOnline()) return;
-
-    try {
-      final response = await http.get(
-        // Toutes les transactions : les totaux par période ne doivent pas se limiter à la 1re page
-        Uri.parse('${ApiConstants.financesUrl}?all=true'),
-        headers: _headers(t),
+  Future<void> fetchFinances({String? token}) =>
+      _syncFromServer<FinanceTransaction>(
+        entity: SyncEntity.finance,
+        url: '${ApiConstants.financesUrl}?all=true',
+        fromJson: FinanceTransaction.fromJson,
+        assign: (list) => _finances = list,
+        label: 'finances',
+        token: token,
       );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final List list =
-            body['data'] is List
-                ? body['data']
-                : (body['results'] is List ? body['results'] : []);
-        await LocalDatabase.instance.replaceFromServer(SyncEntity.finance, [
-          for (final item in list) Map<String, dynamic>.from(item),
-        ]);
-        final refreshed = await LocalDatabase.instance.getAll(
-          SyncEntity.finance,
-        );
-        _finances =
-            refreshed.map((f) => FinanceTransaction.fromJson(f.data)).toList();
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error fetching finances: $e');
-    }
-  }
 
   Future<bool> addFinanceTransaction(
     FinanceTransaction transaction, {

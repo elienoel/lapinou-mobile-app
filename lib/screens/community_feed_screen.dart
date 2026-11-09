@@ -1,3 +1,4 @@
+import '../widgets/app_ui.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -242,7 +243,11 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.inbox_outlined, size: 48, color: AppColors.textSecondary),
+                    const Icon(
+                      Icons.inbox_outlined,
+                      size: 48,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(height: 12),
                     Text(
                       _selectedFilter == 'Tous'
@@ -580,12 +585,9 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                   onReact: (emoji) {
                     final token = auth.token;
                     if (token == null || token.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Veuillez vous connecter pour réagir à ce post',
-                          ),
-                        ),
+                      showAppSnack(
+                        context,
+                        'Veuillez vous connecter pour réagir à ce post',
                       );
                       return;
                     }
@@ -687,26 +689,10 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     final messenger = ScaffoldMessenger.of(context);
     if (token == null || token.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Supprimer la publication ?'),
-            content: const Text('Cette action est définitive.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annuler'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Supprimer',
-                  style: TextStyle(color: Colors.redAccent),
-                ),
-              ),
-            ],
-          ),
+    final confirmed = await confirmAction(
+      context,
+      title: 'Supprimer la publication ?',
+      message: 'Cette action est définitive.',
     );
     if (confirmed != true) return;
 
@@ -855,16 +841,13 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
       !_isSubmitting &&
       (_textController.text.trim().isNotEmpty || _media.isNotEmpty);
 
-  void _toast(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
-    );
-  }
-
   Future<void> _addFiles(List<XFile> picked) async {
     for (final x in picked) {
       if (_media.length >= _maxMedia) {
-        _toast('Maximum $_maxMedia photos/vidéos par publication.');
+        showAppSnack(
+          context,
+          'Maximum $_maxMedia photos/vidéos par publication.',
+        );
         break;
       }
       final dot = x.path.lastIndexOf('.');
@@ -872,7 +855,8 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
       final isVideo = _videoExtensions.contains(ext);
       final file = File(x.path);
       if (isVideo && await file.length() > _maxVideoBytes) {
-        _toast(
+        showAppSnack(
+          context,
           '« ${x.name} » dépasse 100 Mo, choisissez une vidéo plus courte.',
         );
         continue;
@@ -885,7 +869,10 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
   Future<void> _pickFromGallery() async {
     final remaining = _maxMedia - _media.length;
     if (remaining <= 0) {
-      _toast('Maximum $_maxMedia photos/vidéos par publication.');
+      showAppSnack(
+        context,
+        'Maximum $_maxMedia photos/vidéos par publication.',
+      );
       return;
     }
     try {
@@ -896,7 +883,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
       );
       await _addFiles(picked);
     } catch (e) {
-      _toast('Impossible d\'accéder à la galerie.');
+      showAppSnack(context, 'Impossible d\'accéder à la galerie.');
     }
   }
 
@@ -915,7 +902,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
               );
       if (x != null) await _addFiles([x]);
     } catch (e) {
-      _toast('Impossible d\'utiliser l\'appareil photo.');
+      showAppSnack(context, 'Impossible d\'utiliser l\'appareil photo.');
     }
   }
 
@@ -953,7 +940,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     final auth = context.read<AuthProvider>();
     final token = auth.token;
     if (token == null || token.isEmpty) {
-      _toast('Veuillez vous connecter pour publier');
+      showAppSnack(context, 'Veuillez vous connecter pour publier');
       return;
     }
 
@@ -987,7 +974,8 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
       );
     } else {
       setState(() => _isSubmitting = false);
-      _toast(
+      showAppSnack(
+        context,
         provider.lastError ??
             'Erreur lors de la publication. Vérifiez votre connexion et la taille des fichiers.',
       );

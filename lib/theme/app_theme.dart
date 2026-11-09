@@ -31,10 +31,13 @@ class AppTheme {
       // Toutes les pages, feuilles et boîtes de dialogue ont un fond blanc
       scaffoldBackgroundColor: AppColors.scaffoldBackground,
       canvasColor: Colors.white,
+      // Couleur primaire : noir. Couleur secondaire : violet (#6A5F8C).
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
         onPrimary: Colors.white,
+        secondary: AppColors.secondary,
+        onSecondary: Colors.white,
         surface: AppColors.cardSurface,
         surfaceTint: Colors.transparent,
         surfaceContainerHighest: AppColors.primarySoft,

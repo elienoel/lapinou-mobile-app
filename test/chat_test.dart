@@ -4,12 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:lapinou/models/chat.dart';
-import 'package:lapinou/providers/chat_provider.dart';
-import 'package:lapinou/screens/chat_screen.dart';
-import 'package:lapinou/screens/conversations_screen.dart';
-import 'package:lapinou/utils/time_ago.dart';
-import 'package:lapinou/widgets/chat_icon_button.dart';
+import 'package:clap_in/models/chat.dart';
+import 'package:clap_in/providers/chat_provider.dart';
+import 'package:clap_in/screens/chat_screen.dart';
+import 'package:clap_in/screens/conversations_screen.dart';
+import 'package:clap_in/utils/time_ago.dart';
+import 'package:clap_in/widgets/chat_icon_button.dart';
 import 'support/chat_fakes.dart';
 
 void main() {

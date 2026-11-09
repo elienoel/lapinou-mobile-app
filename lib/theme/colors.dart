@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // ---- Couleur principale --------------------------------------------------
-  // Pour changer la couleur de l'application, modifiez uniquement `primary`.
-  // Règle de design : un fond est TOUJOURS soit `primary` (plein), soit blanc ;
-  // jamais de fond teinté ou semi-transparent. La couleur s'exprime par les
-  // fonds pleins, les bordures et les textes.
+  // ---- Identité Clap'in : noir (logo) + violet ---------------------------------
+  // `primary` (noir) porte l'identité du logo : textes forts, contours, fonds pleins.
+  // `secondary` (violet) apporte la couleur : boutons, navigation, accents,
+  // dégradés et pastilles teintées.
   static const Color primary = Color(0xFF000000);
 
   /// Texte et icônes posés sur un fond `primary`
@@ -15,11 +14,22 @@ class AppColors {
   /// la couleur principale à très faible opacité (comme la bulle verte de WhatsApp).
   static final Color primaryTint = primary.withAlpha(9);
 
-  // ---- Couleur secondaire ---------------------------------------------------
-  /// Utilisée pour les cartes de race du formulaire lapin (fond teinté, 0.3 d'opacité) :
-  /// seconde exception à la règle fond plein/blanc, au même titre que `primaryTint`.
-  static const Color secondary = Color(0xFFF97E4B);
-  static final Color secondaryTint = secondary.withAlpha(15); // 0.3 * 255
+  // ---- Couleur secondaire : violet -------------------------------------------
+  static const Color secondary = Color(0xFF6A5F8C);
+  static const Color secondaryDark = Color(0xFF453D5E);
+  static const Color secondaryLight = Color(0xFFA49CC0);
+
+  /// Fond violet très clair (pastilles d'icônes, badges, cartes de race)
+  static const Color secondarySoft = Color(0xFFEFEDF4);
+  static final Color secondaryTint = secondary.withAlpha(22);
+
+  /// Dégradé de marque : du noir du logo vers le violet
+  static const LinearGradient brandGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF0A0A0F), Color(0xFF453D5E), secondary],
+    stops: [0.0, 0.55, 1.0],
+  );
 
   /// Anciennes variantes de la couleur principale : identiques à `primary`
   static const Color primaryDark = primary;

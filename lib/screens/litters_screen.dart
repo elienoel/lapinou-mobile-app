@@ -1,3 +1,5 @@
+import '../utils/formatters.dart';
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -59,28 +61,12 @@ class _LittersViewState extends State<LittersView> {
   Future<void> _confirmDelete(Litter lit) async {
     final messenger = ScaffoldMessenger.of(context);
     final provider = context.read<RabbitProvider>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Supprimer cette mise bas ?'),
-            content: const Text(
-              "L'accouplement lié repassera en cours. Cette action est définitive.",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annuler'),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red.shade700,
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Supprimer'),
-              ),
-            ],
-          ),
+    final ok = await confirmAction(
+      context,
+      title: 'Supprimer cette mise bas ?',
+      message:
+          "L'accouplement lié repassera en cours. Cette action est définitive.",
+      destructive: true,
     );
     if (ok != true || !mounted) return;
     await provider.deleteLitter(lit);
@@ -325,7 +311,7 @@ class _LittersViewState extends State<LittersView> {
     final weaningLine = switch (status) {
       LitterStatus.weaned =>
         lit.weanedAt != null
-            ? 'Sevrée le ${DateFormat('dd/MM/yyyy').format(lit.weanedAt!)}'
+            ? 'Sevrée le ${formatDate(lit.weanedAt!)}'
             : 'Sevrage terminé',
       LitterStatus.weaningDue =>
         d == 0
@@ -337,18 +323,7 @@ class _LittersViewState extends State<LittersView> {
     return Container(
       key: ValueKey('litter-${lit.id}'),
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(5),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: appCardDecoration(shadow: true),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -461,7 +436,7 @@ class _LittersViewState extends State<LittersView> {
               children: [
                 Flexible(
                   child: Text(
-                    'Né le ${DateFormat('dd/MM/yyyy').format(lit.birthDate)} · J${lit.ageDays}',
+                    'Né le ${formatDate(lit.birthDate)} · J${lit.ageDays}',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 12,
@@ -590,11 +565,7 @@ class _LittersViewState extends State<LittersView> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
+      decoration: appCardDecoration(),
       child: Column(
         children: [
           const AppIcon(AppIcons.nest, size: 56, color: AppColors.primary),

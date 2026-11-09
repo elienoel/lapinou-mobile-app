@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lapinou/models/care.dart';
-import 'package:lapinou/widgets/app_icon.dart';
+import 'package:clap_in/models/care.dart';
+import 'package:clap_in/widgets/app_icon.dart';
 
 Future<void> _pump(WidgetTester tester, Widget child) => tester.pumpWidget(
   MaterialApp(home: Scaffold(body: Center(child: child))),

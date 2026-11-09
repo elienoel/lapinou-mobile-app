@@ -1,5 +1,6 @@
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import '../utils/formatters.dart';
 import 'package:provider/provider.dart';
 import '../models/care.dart';
 import '../providers/rabbit_provider.dart';
@@ -47,36 +48,14 @@ class _CareScreenState extends State<CareScreen>
     super.dispose();
   }
 
-  static final _dateFormat = DateFormat('dd/MM/yyyy');
-
-  void _snack(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
   Future<bool> _confirm(String title, String message, String action) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: Text(title),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Retour'),
-              ),
-              FilledButton(
-                key: const ValueKey('care-confirm'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(action),
-              ),
-            ],
-          ),
+    final ok = await confirmAction(
+      context,
+      title: title,
+      message: message,
+      confirmLabel: action,
+      cancelLabel: 'Retour',
+      confirmKey: const ValueKey('care-confirm'),
     );
     return ok == true;
   }
@@ -93,14 +72,17 @@ class _CareScreenState extends State<CareScreen>
       purpose: renewing?.purpose,
     );
     if (saved == true && mounted) {
-      _snack(existing == null ? 'Soin enregistré' : 'Soin modifié');
+      showAppSnack(
+        context,
+        existing == null ? 'Soin enregistré' : 'Soin modifié',
+      );
     }
   }
 
   Future<void> _deleteRecord(CareRecord record) async {
     if (!await _confirm(
       'Supprimer ce soin ?',
-      '${record.treatmentName} du ${_dateFormat.format(record.date)} sera retiré de l\'historique.',
+      '${record.treatmentName} du ${formatDate(record.date)} sera retiré de l\'historique.',
       'Supprimer',
     )) {
       return;
@@ -109,7 +91,7 @@ class _CareScreenState extends State<CareScreen>
     final error = await context.read<RabbitProvider>().deleteCareRecord(
       record.id,
     );
-    if (mounted) _snack(error ?? 'Soin supprimé');
+    if (mounted) showAppSnack(context, error ?? 'Soin supprimé');
   }
 
   Future<void> _deleteTreatment(CareTreatment treatment) async {
@@ -124,7 +106,7 @@ class _CareScreenState extends State<CareScreen>
     final error = await context.read<RabbitProvider>().deleteCareTreatment(
       treatment.id,
     );
-    if (mounted) _snack(error ?? 'Type de soin supprimé');
+    if (mounted) showAppSnack(context, error ?? 'Type de soin supprimé');
   }
 
   @override
@@ -298,8 +280,8 @@ class _CareScreenState extends State<CareScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'À faire le ${_dateFormat.format(care.dueDate)}'
-                      ' · dernier soin le ${_dateFormat.format(care.lastDate)}',
+                      'À faire le ${formatDate(care.dueDate)}'
+                      ' · dernier soin le ${formatDate(care.lastDate)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -388,7 +370,7 @@ class _CareScreenState extends State<CareScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Effectué le ${_dateFormat.format(record.date)}',
+                      'Effectué le ${formatDate(record.date)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -429,7 +411,7 @@ class _CareScreenState extends State<CareScreen>
           if (record.nextDueDate != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Prochain soin le ${_dateFormat.format(record.nextDueDate!)}',
+              'Prochain soin le ${formatDate(record.nextDueDate!)}',
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,

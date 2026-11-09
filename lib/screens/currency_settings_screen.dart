@@ -1,3 +1,4 @@
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/currency.dart';
@@ -91,11 +92,7 @@ class CurrencySettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
+              decoration: appCardDecoration(),
               child: Column(
                 children: [
                   for (int i = 0; i < kCurrencies.length; i++) ...[

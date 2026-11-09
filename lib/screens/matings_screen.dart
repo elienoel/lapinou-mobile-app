@@ -1,3 +1,5 @@
+import '../utils/formatters.dart';
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -500,7 +502,7 @@ class _MatingsScreenState extends State<MatingsScreen>
                                 content: Text(
                                   isToday
                                       ? 'Accouplement enregistré avec succès !'
-                                      : 'Accouplement du ${DateFormat('dd/MM/yyyy').format(matingDate)} enregistré (J${daysAgo + 1} de gestation) !',
+                                      : 'Accouplement du ${formatDate(matingDate)} enregistré (J${daysAgo + 1} de gestation) !',
                                 ),
                                 backgroundColor: AppColors.primary,
                               ),
@@ -701,28 +703,12 @@ class _MatingsScreenState extends State<MatingsScreen>
   ) async {
     final female = provider.getRabbitById(m.femaleId)?.name ?? 'la femelle';
     final male = provider.getRabbitById(m.maleId)?.name ?? 'le mâle';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Supprimer cette saillie ?'),
-            content: Text(
-              'La saillie $female × $male sera retirée de la liste. Cette action est définitive.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annuler'),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red.shade700,
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Supprimer'),
-              ),
-            ],
-          ),
+    final ok = await confirmAction(
+      context,
+      title: 'Supprimer cette saillie ?',
+      message:
+          'La saillie $female × $male sera retirée de la liste. Cette action est définitive.',
+      destructive: true,
     );
     if (ok != true || !context.mounted) return;
     final error = await provider.deleteMating(m.id);
@@ -760,15 +746,7 @@ class _MatingsScreenState extends State<MatingsScreen>
 
     final error = await provider.cancelMating(m, reason: reason);
     if (!mounted) return;
-    _snack(error ?? 'Saillie annulée', error: error != null);
-  }
-
-  void _snack(String message, {bool error = false}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: AppColors.primary),
-      );
+    showAppSnack(context, error ?? 'Saillie annulée', error: error != null);
   }
 
   // ---- Carte d'un accouplement ----
@@ -817,18 +795,7 @@ class _MatingsScreenState extends State<MatingsScreen>
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(color: AppColors.cardBorder),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(5),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+        decoration: appCardDecoration(shadow: true),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1008,10 +975,7 @@ class _MatingsScreenState extends State<MatingsScreen>
               ),
               child: Column(
                 children: [
-                  _buildDateRow(
-                    'Date de saillie',
-                    DateFormat('dd/MM/yyyy').format(m.matingDate),
-                  ),
+                  _buildDateRow('Date de saillie', formatDate(m.matingDate)),
                   const SizedBox(height: 6),
                   _buildDateRow(
                     m.palpationDoneAt != null || m.palpationDone
@@ -1027,7 +991,7 @@ class _MatingsScreenState extends State<MatingsScreen>
                   const SizedBox(height: 6),
                   _buildDateRow(
                     'Pose Boîte à Nid (J28)',
-                    DateFormat('dd/MM/yyyy').format(m.nestBoxDate),
+                    formatDate(m.nestBoxDate),
                     isPast: DateTime.now().isAfter(m.nestBoxDate),
                     isAlert: active && m.shouldInstallNestBox,
                   ),
@@ -1087,7 +1051,7 @@ class _MatingsScreenState extends State<MatingsScreen>
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    'Mise bas possible à partir du ${DateFormat('dd/MM/yyyy').format(m.earliestKindlingDate)} '
+                    'Mise bas possible à partir du ${formatDate(m.earliestKindlingDate)} '
                     '(${Mating.minGestationDays} jours après la saillie).',
                     key: ValueKey('kindle-hint-${m.id}'),
                     style: const TextStyle(
@@ -1112,11 +1076,7 @@ class _MatingsScreenState extends State<MatingsScreen>
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
+      decoration: appCardDecoration(),
       child: Text(
         text,
         style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
@@ -1236,7 +1196,7 @@ class _MatingsScreenState extends State<MatingsScreen>
         break;
       }
     }
-    final dateFmt = DateFormat('dd/MM/yyyy');
+
     final failed = m.status == MatingStatus.failed;
     final kindled = m.status == MatingStatus.kindled;
 
@@ -1292,7 +1252,7 @@ class _MatingsScreenState extends State<MatingsScreen>
                   icon: Icons.favorite_outline,
                   done: true,
                   title: 'Saillie',
-                  subtitle: 'Le ${dateFmt.format(m.matingDate)}',
+                  subtitle: 'Le ${formatDate(m.matingDate)}',
                 ),
                 _timelineStep(
                   icon: Icons.science_outlined,
@@ -1303,16 +1263,16 @@ class _MatingsScreenState extends State<MatingsScreen>
                       failed
                           ? 'Non gestante'
                           : (m.palpationDoneAt != null
-                              ? 'Faite le ${dateFmt.format(m.palpationDoneAt!)}'
+                              ? 'Faite le ${formatDate(m.palpationDoneAt!)}'
                               : (m.palpationDone
                                   ? 'Gestation confirmée'
-                                  : 'Prévue le ${dateFmt.format(m.palpationDate)} — pas encore faite')),
+                                  : 'Prévue le ${formatDate(m.palpationDate)} — pas encore faite')),
                 ),
                 _timelineStep(
                   icon: Icons.inventory_2_outlined,
                   done: null,
                   title: 'Pose de la boîte à nid',
-                  subtitle: 'Repère : vers le ${dateFmt.format(m.nestBoxDate)}',
+                  subtitle: 'Repère : vers le ${formatDate(m.nestBoxDate)}',
                 ),
                 _timelineStep(
                   icon: Icons.child_friendly_outlined,
@@ -1323,8 +1283,8 @@ class _MatingsScreenState extends State<MatingsScreen>
                       failed
                           ? 'Accouplement infructueux'
                           : (litter != null
-                              ? 'Faite le ${dateFmt.format(litter.birthDate)} — ${litter.bornAlive} né(s) vivant(s)'
-                              : 'Prévue le ${dateFmt.format(m.expectedKindlingDate)} — pas encore faite'),
+                              ? 'Faite le ${formatDate(litter.birthDate)} — ${litter.bornAlive} né(s) vivant(s)'
+                              : 'Prévue le ${formatDate(m.expectedKindlingDate)} — pas encore faite'),
                 ),
                 _timelineStep(
                   icon: Icons.pets_outlined,
@@ -1334,8 +1294,8 @@ class _MatingsScreenState extends State<MatingsScreen>
                       litter == null
                           ? 'Pas encore de portée enregistrée'
                           : (litter.isWeaned
-                              ? 'Terminé${litter.weanedAt != null ? ' le ${dateFmt.format(litter.weanedAt!)}' : ''} (${litter.weaned}/${litter.bornAlive})'
-                              : 'Prévu vers le ${dateFmt.format(litter.calculatedWeaningDate)} — pas encore terminé'),
+                              ? 'Terminé${litter.weanedAt != null ? ' le ${formatDate(litter.weanedAt!)}' : ''} (${litter.weaned}/${litter.bornAlive})'
+                              : 'Prévu vers le ${formatDate(litter.calculatedWeaningDate)} — pas encore terminé'),
                   isLast: true,
                 ),
               ],
@@ -1470,7 +1430,7 @@ Future<void> confirmMatingPalpation(
                           labelText: 'Date de la palpation',
                           prefixIcon: Icon(Icons.event_outlined, size: 20),
                         ),
-                        child: Text(DateFormat('dd/MM/yyyy').format(date)),
+                        child: Text(formatDate(date)),
                       ),
                     ),
                   ],
@@ -1496,14 +1456,7 @@ Future<void> confirmMatingPalpation(
 
   final error = await provider.confirmPalpation(m, doneAt: date);
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(error ?? 'Palpation enregistrée : gestation confirmée'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+  showAppSnack(context, error ?? 'Palpation enregistrée : gestation confirmée');
 }
 
 /// Confirmation d'annulation d'une saillie, avec un motif facultatif.

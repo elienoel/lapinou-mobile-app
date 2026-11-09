@@ -1,3 +1,5 @@
+import '../utils/formatters.dart';
+import '../widgets/app_ui.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -82,10 +84,9 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                   ).deleteRabbit(_currentRabbit.id);
                   Navigator.pop(ctx); // close dialog
                   Navigator.pop(context); // back to list
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${_currentRabbit.name} a été supprimé'),
-                    ),
+                  showAppSnack(
+                    context,
+                    '${_currentRabbit.name} a été supprimé',
                   );
                 },
                 child: const Text(
@@ -591,7 +592,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
     final weaning = switch (status) {
       LitterStatus.weaned =>
         l.weanedAt != null
-            ? 'Sevrée le ${DateFormat('dd/MM/yyyy').format(l.weanedAt!)}'
+            ? 'Sevrée le ${formatDate(l.weanedAt!)}'
             : 'Sevrage terminé',
       LitterStatus.weaningDue =>
         d == 0
@@ -613,7 +614,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
               children: [
                 Expanded(
                   child: Text(
-                    'Née le ${DateFormat('dd/MM/yyyy').format(l.birthDate)} · J${l.ageDays}',
+                    'Née le ${formatDate(l.birthDate)} · J${l.ageDays}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 13.5,
@@ -699,17 +700,10 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
+            decoration: appCardDecoration(),
             child: Column(
               children: [
-                _buildInfoRow(
-                  'Date de naissance',
-                  DateFormat('dd/MM/yyyy').format(r.birthDate),
-                ),
+                _buildInfoRow('Date de naissance', formatDate(r.birthDate)),
                 const Divider(height: 16),
                 _buildInfoRow('Couleur / Robe', r.color),
                 const Divider(height: 16),
@@ -781,7 +775,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${due.treatmentName} · ${DateFormat('dd/MM/yyyy').format(due.dueDate)}',
+                      '${due.treatmentName} · ${formatDate(due.dueDate)}',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -802,11 +796,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
+              decoration: appCardDecoration(),
               child: const Text(
                 'Aucun soin spécifique enregistré pour le moment.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
@@ -818,11 +808,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                 key: ValueKey('rabbit-care-${care.id}'),
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
+                decoration: appCardDecoration(),
                 child: Row(
                   children: [
                     Container(
@@ -854,7 +840,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                           ),
                           Text(
                             [
-                              DateFormat('dd/MM/yyyy').format(care.date),
+                              formatDate(care.date),
                               if (care.purpose.isNotEmpty) care.purpose,
                             ].join(' • '),
                             style: const TextStyle(
@@ -1308,30 +1294,15 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
       if (mounted) {
         setState(() => _isUploadingPhoto = false);
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo ajoutée avec succès !'),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          showAppSnack(context, 'Photo ajoutée avec succès !');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Échec du téléversement de la photo.'),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          showAppSnack(context, 'Échec du téléversement de la photo.');
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingPhoto = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        showAppSnack(context, 'Erreur: $e');
       }
     }
   }
@@ -1348,12 +1319,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
       token: auth.token,
     );
     if (mounted && success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Photo principale mise à jour !'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      showAppSnack(context, 'Photo principale mise à jour !');
     }
   }
 
@@ -1385,11 +1351,7 @@ class _RabbitDetailScreenState extends State<RabbitDetailScreen>
                     token: auth.token,
                   );
                   if (mounted && success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Photo supprimée avec succès'),
-                      ),
-                    );
+                    showAppSnack(context, 'Photo supprimée avec succès');
                   }
                 },
                 child: const Text(

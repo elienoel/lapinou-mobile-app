@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lapinou/services/validators.dart';
+import 'package:clap_in/services/validators.dart';
 
 void main() {
   test(

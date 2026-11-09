@@ -157,7 +157,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     _buildMenuCard(
                       context: context,
                       icon: AppIcons.mating,
-                      imageAsset: 'assets/accouplement.png',
+                      imageAsset: 'assets/accouplement.webp',
                       title: 'Accouplements & Mises bas',
                       subtitle:
                           'Saillies, palpation, mises bas et sevrage des lapereaux',

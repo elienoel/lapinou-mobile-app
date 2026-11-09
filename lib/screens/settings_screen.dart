@@ -1,9 +1,9 @@
+import '../widgets/app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/sync_service.dart';
 import '../theme/colors.dart';
-import '../theme/radius.dart';
 import 'category_settings_screen.dart';
 import 'currency_settings_screen.dart';
 import 'sync_settings_screen.dart';
@@ -41,11 +41,7 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
+              decoration: appCardDecoration(),
               child: Column(
                 children: [
                   _tile(

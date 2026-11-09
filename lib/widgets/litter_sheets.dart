@@ -1,5 +1,6 @@
+import '../utils/formatters.dart';
+import 'app_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/litter.dart';
 import '../models/rabbit.dart';
@@ -248,128 +249,101 @@ class _WeanLitterSheetState extends State<WeanLitterSheet> {
     final inCage = mother != null && mother.cageId != null;
     final remaining = litter.kitsRemaining;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Sevrer la portée de ${mother?.name ?? 'la mère'}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+    return SheetBody(
+      children: [
+        Text(
+          'Sevrer la portée de ${mother?.name ?? 'la mère'}',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$remaining lapereau${remaining > 1 ? 'x' : ''} au nid · né${litter.bornAlive > 1 ? 's' : ''} le '
+          '${formatDate(litter.birthDate)} (J${litter.ageDays})',
+          style: const TextStyle(
+            fontSize: 12.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        InkWell(
+          key: const ValueKey('wean-date'),
+          onTap: _pickDate,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Date du sevrage',
+              prefixIcon: Icon(Icons.event_outlined, size: 20),
             ),
-            const SizedBox(height: 4),
-            Text(
-              '$remaining lapereau${remaining > 1 ? 'x' : ''} au nid · né${litter.bornAlive > 1 ? 's' : ''} le '
-              '${DateFormat('dd/MM/yyyy').format(litter.birthDate)} (J${litter.ageDays})',
+            child: Text(formatDate(_date)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _Stepper(
+          label: 'Lapereaux sevrés',
+          value: _count,
+          min: 1,
+          max: remaining,
+          valueKey: const ValueKey('wean-count'),
+          onChanged:
+              (v) => setState(() {
+                _count = v;
+                _syncRows();
+              }),
+        ),
+        if (_count < remaining)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'Sevrage partiel : ${remaining - _count} resteront au nid avec leur mère.',
               style: const TextStyle(
-                fontSize: 12.5,
+                fontSize: 12,
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 16),
-            InkWell(
-              key: const ValueKey('wean-date'),
-              onTap: _pickDate,
-              borderRadius: BorderRadius.circular(12),
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Date du sevrage',
-                  prefixIcon: Icon(Icons.event_outlined, size: 20),
-                ),
-                child: Text(DateFormat('dd/MM/yyyy').format(_date)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _Stepper(
-              label: 'Lapereaux sevrés',
-              value: _count,
-              min: 1,
-              max: remaining,
-              valueKey: const ValueKey('wean-count'),
-              onChanged:
-                  (v) => setState(() {
-                    _count = v;
-                    _syncRows();
-                  }),
-            ),
-            if (_count < remaining)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  'Sevrage partiel : ${remaining - _count} resteront au nid avec leur mère.',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              key: const ValueKey('wean-create-records'),
-              contentPadding: EdgeInsets.zero,
-              activeColor: AppColors.primary,
-              title: const Text(
-                'Créer les fiches lapins',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Text(
-                inCage
-                    ? 'Rattachées à la mère et au père, dans sa cage (${mother.cageNumber}).'
-                    : 'Rattachées à la mère et au père.',
-                style: const TextStyle(fontSize: 12),
-              ),
-              value: _createRecords,
-              onChanged:
-                  _saving ? null : (v) => setState(() => _createRecords = v),
-            ),
-            if (_createRecords) ...[
-              for (int i = 0; i < _rows.length; i++) _buildKitRow(i),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                key: const ValueKey('wean-error'),
-                style: TextStyle(
-                  color: Colors.red.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                key: const ValueKey('wean-submit'),
-                onPressed: _saving ? null : _submit,
-                child:
-                    _saving
-                        ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : Text(
-                          _createRecords
-                              ? 'Sevrer $_count et créer les fiches'
-                              : 'Sevrer $_count lapereau${_count > 1 ? 'x' : ''}',
-                        ),
-              ),
-            ),
-          ],
+          ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          key: const ValueKey('wean-create-records'),
+          contentPadding: EdgeInsets.zero,
+          activeColor: AppColors.primary,
+          title: const Text(
+            'Créer les fiches lapins',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: Text(
+            inCage
+                ? 'Rattachées à la mère et au père, dans sa cage (${mother.cageNumber}).'
+                : 'Rattachées à la mère et au père.',
+            style: const TextStyle(fontSize: 12),
+          ),
+          value: _createRecords,
+          onChanged: _saving ? null : (v) => setState(() => _createRecords = v),
         ),
-      ),
+        if (_createRecords) ...[
+          for (int i = 0; i < _rows.length; i++) _buildKitRow(i),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _error!,
+            key: const ValueKey('wean-error'),
+            style: TextStyle(
+              color: Colors.red.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        SubmitButton(
+          key: const ValueKey('wean-submit'),
+          label:
+              _createRecords
+                  ? 'Sevrer $_count et créer les fiches'
+                  : 'Sevrer $_count lapereau${_count > 1 ? 'x' : ''}',
+          saving: _saving,
+          onPressed: _submit,
+        ),
+      ],
     );
   }
 
@@ -531,104 +505,92 @@ class _EditLitterSheetState extends State<EditLitterSheet> {
   @override
   Widget build(BuildContext context) {
     final remaining = (_alive - litter.weaned - _died).clamp(0, 999);
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Modifier la portée',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 14),
-            _Stepper(
-              label: 'Nés vivants',
-              value: _alive,
-              min: _minAlive,
-              valueKey: const ValueKey('edit-alive'),
-              onChanged: (v) => setState(() => _alive = v),
-            ),
-            _Stepper(
-              label: 'Mort-nés',
-              value: _stillBorn,
-              valueKey: const ValueKey('edit-stillborn'),
-              onChanged: (v) => setState(() => _stillBorn = v),
-            ),
-            _Stepper(
-              label: 'Morts au nid',
-              value: _died,
-              max: (_alive - litter.weaned).clamp(0, 99),
-              valueKey: const ValueKey('edit-died'),
-              onChanged: (v) => setState(() => _died = v),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Restent au nid : $remaining · déjà sevrés : ${litter.weaned}',
-              style: const TextStyle(
-                fontSize: 12.5,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 14),
-            InkWell(
-              key: const ValueKey('edit-weaning-date'),
-              onTap: _pickDate,
-              borderRadius: BorderRadius.circular(12),
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Date de sevrage prévue',
-                  prefixIcon: Icon(Icons.event_outlined, size: 20),
-                ),
-                child: Text(DateFormat('dd/MM/yyyy').format(_weaningDate)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey('edit-notes'),
-              controller: _notes,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Observations'),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: TextStyle(
-                  color: Colors.red.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                key: const ValueKey('edit-save'),
-                onPressed: _saving ? null : _save,
-                child:
-                    _saving
-                        ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : const Text('Enregistrer'),
-              ),
-            ),
-          ],
+    return SheetBody(
+      children: [
+        const Text(
+          'Modifier la portée',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
-      ),
+        const SizedBox(height: 14),
+        _Stepper(
+          label: 'Nés vivants',
+          value: _alive,
+          min: _minAlive,
+          valueKey: const ValueKey('edit-alive'),
+          onChanged: (v) => setState(() => _alive = v),
+        ),
+        _Stepper(
+          label: 'Mort-nés',
+          value: _stillBorn,
+          valueKey: const ValueKey('edit-stillborn'),
+          onChanged: (v) => setState(() => _stillBorn = v),
+        ),
+        _Stepper(
+          label: 'Morts au nid',
+          value: _died,
+          max: (_alive - litter.weaned).clamp(0, 99),
+          valueKey: const ValueKey('edit-died'),
+          onChanged: (v) => setState(() => _died = v),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Restent au nid : $remaining · déjà sevrés : ${litter.weaned}',
+          style: const TextStyle(
+            fontSize: 12.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 14),
+        InkWell(
+          key: const ValueKey('edit-weaning-date'),
+          onTap: _pickDate,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Date de sevrage prévue',
+              prefixIcon: Icon(Icons.event_outlined, size: 20),
+            ),
+            child: Text(formatDate(_weaningDate)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('edit-notes'),
+          controller: _notes,
+          maxLines: 2,
+          decoration: const InputDecoration(labelText: 'Observations'),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _error!,
+            style: TextStyle(
+              color: Colors.red.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            key: const ValueKey('edit-save'),
+            onPressed: _saving ? null : _save,
+            child:
+                _saving
+                    ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : const Text('Enregistrer'),
+          ),
+        ),
+      ],
     );
   }
 }
