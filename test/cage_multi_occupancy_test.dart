@@ -272,20 +272,27 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // choisir la cage A1
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String?>, 'Aucune cage').first);
+      // étape 1 : le nom, puis étapes suivantes jusqu'à l'emplacement
+      await tester.enterText(find.byType(TextFormField).first, 'Noisette');
+      await tester.tap(find.byKey(const ValueKey('birth-date')));
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('Cage A1').last);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wizard-next')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wizard-next')));
+      await tester.pumpAndSettle();
+      expect(find.text('Emplacement'), findsOneWidget);
+
+      // choisir la cage A1
+      await tester.tap(find.textContaining('Cage A1'));
       await tester.pumpAndSettle();
 
       // la première loge libre est proposée par défaut (loge 2)
       expect(find.textContaining('Loge 2 · libre'), findsOneWidget);
 
-      // la loge occupée reste sélectionnable, avec son occupant affiché
-      await tester.tap(find.textContaining('Loge 2 · libre'));
-      await tester.pumpAndSettle();
-      expect(find.text('Loge 1 · Bella'), findsOneWidget);
-      await tester.tap(find.text('Loge 1 · Bella'));
+      // la loge occupée se choisit en la touchant sur le schéma, avec son occupant affiché
+      await tester.tap(find.text('1'));
       await tester.pumpAndSettle();
       expect(find.text('Loge 1 · Bella'), findsOneWidget);
     });

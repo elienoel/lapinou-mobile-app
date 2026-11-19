@@ -228,7 +228,7 @@ Future<void> showCageForm(BuildContext context, {Cage? edit}) {
             required String label,
             required int value,
             required int min,
-            required int max,
+            int? max, // null : pas de limite
             required ValueChanged<int> onChanged,
             bool locked = false,
           }) {
@@ -266,7 +266,7 @@ Future<void> showCageForm(BuildContext context, {Cage? edit}) {
                 IconButton.filled(
                   visualDensity: VisualDensity.compact,
                   onPressed:
-                      !locked && value < max
+                      !locked && (max == null || value < max)
                           ? () => setState(() => onChanged(value + 1))
                           : null,
                   icon: const Icon(Icons.add),
@@ -374,7 +374,6 @@ Future<void> showCageForm(BuildContext context, {Cage? edit}) {
                               label: 'Colonnes',
                               value: columns,
                               min: 1,
-                              max: Cage.maxColumns,
                               onChanged: (v) => columns = v,
                               locked: columnsLocked,
                             ),

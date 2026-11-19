@@ -63,42 +63,49 @@ void main() {
   group('FinancePeriod', () {
     final now = DateTime(2026, 9, 26, 15, 30);
 
-    test('predefined periods have inclusive day bounds', () {
-      final month = const FinancePeriod(FinancePeriodKind.thisMonth).range(now)!;
+    test('months, years and everything have inclusive day bounds', () {
+      final month = FinancePeriod.thisMonth(now).range()!;
       expect((month.start, month.end), (DateTime(2026, 9, 1), DateTime(2026, 9, 30)));
 
-      final last = const FinancePeriod(FinancePeriodKind.lastMonth).range(now)!;
-      expect((last.start, last.end), (DateTime(2026, 8, 1), DateTime(2026, 8, 31)));
+      final feb = FinancePeriod.month(2028, 2).range()!;
+      expect(feb.end, DateTime(2028, 2, 29), reason: 'année bissextile');
 
-      final year = const FinancePeriod(FinancePeriodKind.thisYear).range(now)!;
-      expect((year.start, year.end), (DateTime(2026, 1, 1), DateTime(2026, 12, 31)));
+      final year = FinancePeriod.year(2025).range()!;
+      expect((year.start, year.end), (DateTime(2025, 1, 1), DateTime(2025, 12, 31)));
 
-      expect(FinancePeriod.all.range(now), isNull);
+      expect(FinancePeriod.all.range(), isNull);
     });
 
-    test('last month wraps over the new year', () {
-      final january = DateTime(2026, 1, 10);
-      final last = const FinancePeriod(FinancePeriodKind.lastMonth).range(january)!;
-      expect((last.start, last.end), (DateTime(2025, 12, 1), DateTime(2025, 12, 31)));
+    test('months go back from the current one, across the new year', () {
+      final months = FinancePeriod.recentMonths(4, DateTime(2026, 2, 10));
+      expect(months.map((m) => m.label), [
+        'Février 2026',
+        'Janvier 2026',
+        'Décembre 2025',
+        'Novembre 2025',
+      ]);
+      expect(FinancePeriod.month(2026, 0), FinancePeriod.month(2025, 12));
+      expect(FinancePeriod.year(2026).label, 'Année 2026');
     });
 
     test('contains ignores the time of day and includes both bounds', () {
-      const month = FinancePeriod(FinancePeriodKind.thisMonth);
-      expect(month.contains(DateTime(2026, 9, 1, 0, 0), now), isTrue);
-      expect(month.contains(DateTime(2026, 9, 30, 23, 59), now), isTrue);
-      expect(month.contains(DateTime(2026, 8, 31, 23, 59), now), isFalse);
-      expect(month.contains(DateTime(2026, 10, 1), now), isFalse);
-      expect(FinancePeriod.all.contains(DateTime(1999, 1, 1), now), isTrue);
+      final month = FinancePeriod.thisMonth(now);
+      expect(month.contains(DateTime(2026, 9, 1, 0, 0)), isTrue);
+      expect(month.contains(DateTime(2026, 9, 30, 23, 59)), isTrue);
+      expect(month.contains(DateTime(2026, 8, 31, 23, 59)), isFalse);
+      expect(month.contains(DateTime(2026, 10, 1)), isFalse);
+      expect(FinancePeriod.all.contains(DateTime(1999, 1, 1)), isTrue);
     });
 
     test('a custom range is normalised to whole days', () {
       final p = FinancePeriod.custom(
         DateTimeRange(start: DateTime(2026, 3, 5, 18), end: DateTime(2026, 3, 9, 7)),
       );
-      expect(p.contains(DateTime(2026, 3, 5, 0, 1), now), isTrue);
-      expect(p.contains(DateTime(2026, 3, 9, 23, 0), now), isTrue);
-      expect(p.contains(DateTime(2026, 3, 10), now), isFalse);
+      expect(p.contains(DateTime(2026, 3, 5, 0, 1)), isTrue);
+      expect(p.contains(DateTime(2026, 3, 9, 23, 0)), isTrue);
+      expect(p.contains(DateTime(2026, 3, 10)), isFalse);
       expect(p.describe(), 'Du 05/03/2026 au 09/03/2026');
+      expect(p.label, 'Du 05/03/2026 au 09/03/2026');
     });
 
     test('totals split income and expenses', () {
@@ -117,7 +124,13 @@ void main() {
     final lastMonthDay = DateTime(today.year, today.month - 1, 15);
     final longAgo = DateTime(today.year - 2, 6, 1);
 
-    testWidgets('the period drives the list, the counters and the banner', (
+    String monthKey(DateTime d) => 'period-month-${d.year}-${d.month}';
+    String monthLabel(DateTime d) {
+      final m = DateFormat('MMMM yyyy', 'fr_FR').format(d);
+      return '${m[0].toUpperCase()}${m.substring(1)}';
+    }
+
+    testWidgets('the page opens on the current month, months go backwards', (
       tester,
     ) async {
       await _pump(tester, [
@@ -126,59 +139,92 @@ void main() {
         _tx('3', 'Vente ancienne', 500, longAgo),
       ]);
 
-      // Tout : trois transactions, aucune période
-      expect(find.text('Vente du jour'), findsOneWidget);
-      expect(find.text('Granulés du mois dernier'), findsOneWidget);
-      expect(find.text('Vente ancienne'), findsOneWidget);
-      expect(find.text('Depuis le début'), findsOneWidget);
-      expect(find.text('Ventes (2)'), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('period-thisMonth')));
-      await tester.pumpAndSettle();
+      // Mois en cours par défaut
       expect(find.text('Vente du jour'), findsOneWidget);
       expect(find.text('Granulés du mois dernier'), findsNothing);
       expect(find.text('Vente ancienne'), findsNothing);
       expect(find.text('Ventes (1)'), findsOneWidget);
       expect(find.text('Dépenses (0)'), findsOneWidget);
-      expect(find.text('BILAN · CE MOIS'), findsOneWidget);
+      expect(find.text('BILAN · ${monthLabel(today).toUpperCase()}'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('period-lastMonth')));
+      // Le mois en cours, puis le précédent, juste après le bouton Filtrer
+      final first = tester.getTopLeft(find.byKey(ValueKey(monthKey(today)))).dx;
+      final second = tester.getTopLeft(find.byKey(ValueKey(monthKey(lastMonthDay)))).dx;
+      final filter = tester.getTopLeft(find.byKey(const ValueKey('period-filter'))).dx;
+      expect(filter < first && first < second, isTrue);
+      expect(find.text(monthLabel(today)), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(ValueKey(monthKey(lastMonthDay))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(monthKey(lastMonthDay))));
       await tester.pumpAndSettle();
       expect(find.text('Granulés du mois dernier'), findsOneWidget);
       expect(find.text('Vente du jour'), findsNothing);
       expect(find.text('Dépenses (1)'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('period-all')));
-      await tester.pumpAndSettle();
-      expect(find.text('Vente ancienne'), findsOneWidget);
+      // Les mois remontent jusqu'à la plus ancienne transaction
+      expect(find.byKey(ValueKey(monthKey(longAgo))), findsOneWidget);
     });
 
-    testWidgets('an empty period says so', (tester) async {
+    testWidgets('an empty month says so', (tester) async {
       await _pump(tester, [_tx('3', 'Vente ancienne', 500, longAgo)]);
-      await tester.tap(find.byKey(const ValueKey('period-thisMonth')));
-      await tester.pumpAndSettle();
       expect(find.text('Aucune transaction sur cette période.'), findsOneWidget);
     });
 
-    testWidgets('a custom period is chosen with the date range picker', (
-      tester,
-    ) async {
+    testWidgets('the filter sheet offers a year or everything', (tester) async {
       await _pump(tester, [
         _tx('1', 'Vente du jour', 1000, today),
         _tx('3', 'Vente ancienne', 500, longAgo),
       ]);
-      // la puce est à droite, dans la barre défilante
-      await tester.ensureVisible(find.byKey(const ValueKey('period-custom')));
-      await tester.tap(find.byKey(const ValueKey('period-custom')));
+      await tester.tap(find.byKey(const ValueKey('period-filter')));
       await tester.pumpAndSettle();
-      expect(find.byType(DateRangePickerDialog), findsOneWidget);
+      expect(find.text('Choisir une période'), findsOneWidget);
+      expect(find.text('Cette année (${today.year})'), findsOneWidget);
+      expect(find.text('Année dernière (${today.year - 1})'), findsOneWidget);
 
-      // La plage proposée est « ce mois » : on valide telle quelle
-      await tester.tap(find.text('Appliquer'));
+      await tester.tap(find.byKey(ValueKey('period-year-${longAgo.year}')));
       await tester.pumpAndSettle();
+      expect(find.text('Vente ancienne'), findsOneWidget);
+      expect(find.text('Vente du jour'), findsNothing);
+      expect(find.text('BILAN · ANNÉE ${longAgo.year}'), findsOneWidget);
+      // le bouton affiche la période choisie
+      expect(find.descendant(of: find.byKey(const ValueKey('period-filter')), matching: find.text('Année ${longAgo.year}')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('period-filter')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('period-all')));
+      await tester.tap(find.byKey(const ValueKey('period-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('Vente ancienne'), findsOneWidget);
+      expect(find.text('Vente du jour'), findsOneWidget);
+      expect(find.text('Depuis le début'), findsOneWidget);
+    });
+
+    testWidgets('a free date range is chosen in the filter sheet', (tester) async {
+      await _pump(tester, [
+        _tx('1', 'Vente du jour', 1000, today),
+        _tx('3', 'Vente ancienne', 500, longAgo),
+      ]);
+      await tester.tap(find.byKey(const ValueKey('period-filter')));
+      await tester.pumpAndSettle();
+      // Plage proposée : celle du mois affiché ; on rouvre la date de début
+      await tester.tap(find.byKey(const ValueKey('period-from')));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.text('Choisir une période'), findsOneWidget, reason: 'la feuille reste ouverte');
+      await tester.ensureVisible(find.byKey(const ValueKey('period-apply')));
+      await tester.tap(find.byKey(const ValueKey('period-apply')));
+      await tester.pumpAndSettle();
+      expect(find.text('Choisir une période'), findsNothing);
+
+      final f = DateFormat('dd/MM/yyyy');
+      final label =
+          'Du ${f.format(DateTime(today.year, today.month, 1))} au ${f.format(DateTime(today.year, today.month + 1, 0))}';
       expect(find.text('Vente du jour'), findsOneWidget);
       expect(find.text('Vente ancienne'), findsNothing);
-      expect(find.text('BILAN · PERSONNALISÉ'), findsOneWidget);
+      expect(find.text(label), findsWidgets);
     });
 
     testWidgets('the form has a date that defaults to today', (tester) async {

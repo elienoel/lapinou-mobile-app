@@ -33,7 +33,7 @@ class CurrencySettingsScreen extends StatelessWidget {
     final current = context.watch<AuthProvider>().currency;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         title: const Text(
           'Devise',

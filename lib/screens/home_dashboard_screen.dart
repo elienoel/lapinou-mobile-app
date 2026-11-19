@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/care.dart';
 import '../models/currency.dart';
 import '../providers/auth_provider.dart';
+import '../providers/marketplace_provider.dart';
 import '../providers/pharmacy_provider.dart';
+import '../providers/promotions_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/author_avatar.dart';
 import '../widgets/chat_icon_button.dart';
+import '../widgets/promo_carousels.dart';
+import '../widgets/wave_edge.dart';
 import '../widgets/reminders.dart';
 import 'activity_screen.dart';
 import 'main_navigation_screen.dart';
 import 'rabbit_list_screen.dart';
 import 'matings_screen.dart';
 import 'care_screen.dart';
+import 'marketplace_screen.dart';
 import 'pharmacy_screen.dart';
 import '../widgets/app_icon.dart';
 
@@ -39,6 +45,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         context.read<RabbitProvider>().fetchAll(token: token);
       }
       context.read<PharmacyProvider>().fetchAll();
+      context.read<MarketplaceProvider>().fetchListings();
+      context.read<PromotionsProvider>().fetchCarousels();
     });
   }
 
@@ -57,10 +65,18 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         final balance = totalIncome - totalExpense;
         final currency = context.watch<AuthProvider>().currency;
         final pharmacyProvider = context.watch<PharmacyProvider>();
+        final marketplace = context.watch<MarketplaceProvider>();
 
-        return Scaffold(
-          body: SafeArea(
-            child: RefreshIndicator(
+        final topInset = MediaQuery.of(context).padding.top;
+
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          // Icônes de la barre d'état en blanc sur le haut violet
+          value: SystemUiOverlayStyle.light,
+          child: Scaffold(
+            backgroundColor: AppColors.pageBackground,
+            // Pas de fond violet fixe : le haut violet défile avec la page
+            body: RefreshIndicator(
+              edgeOffset: topInset,
               onRefresh:
                   () => provider.fetchAll(
                     token: context.read<AuthProvider>().token,
@@ -69,149 +85,214 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. En-tête éleveur
-                    _buildTopHeader(context),
+                    // ---- Haut violet : en-tête et résumé de l'activité ----
+                    Container(
+                      width: double.infinity,
+                      color: AppColors.secondary,
+                      padding: EdgeInsets.fromLTRB(16, topInset + 14, 16, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. En-tête éleveur
+                          _buildTopHeader(context),
 
-                    const SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
-                    // 2. Section "Résumé de l'activité" (Scroll horizontal)
-                    const Text(
-                      'Résumé de l\'activité',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.3,
+                          // 2. Section "Résumé de l'activité" (Scroll horizontal)
+                          const Text(
+                            'Résumé de l\'activité',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          _buildHorizontalActivitySummary(
+                            provider,
+                            totalIncome,
+                            totalExpense,
+                            balance,
+                            currency,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
 
-                    _buildHorizontalActivitySummary(
-                      provider,
-                      totalIncome,
-                      totalExpense,
-                      balance,
-                      currency,
-                    ),
+                    // Transition en vague, à cheval sur le carrousel d'annonces
+                    _buildCarouselBridge(context),
 
-                    const SizedBox(height: 20),
+                    // ---- Bas : fond habituel ----
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 2bis-b. Rappel : actions à mener dans les prochains jours
+                          _buildReminderSection(context, provider),
 
-                    // 2bis-a. Section "Pharmacie"
-                    _buildMenuCard(
-                      context: context,
-                      icon: Icons.medication_outlined,
-                      title: 'Pharmacie',
-                      subtitle:
-                          'Médicaments, prix par pharmacie et pharmacies à proximité',
-                      badge: '${pharmacyProvider.medications.length} produits',
-                      badgeColor: AppColors.primarySoft,
-                      badgeTextColor: AppColors.primary,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const PharmacyScreen(),
-                          ),
-                        );
-                      },
-                    ),
+                          const SizedBox(height: 20),
 
-                    const SizedBox(height: 20),
+                          // 3. Section "Menu Principal" (Les cards du menu)
 
-                    // 2bis-b. Rappel : actions à mener dans les prochains jours
-                    _buildReminderSection(context, provider),
-
-                    const SizedBox(height: 20),
-
-                    // 3. Section "Menu Principal" (Les cards du menu)
-
-                    // Card 1: Mes lapins
-                    _buildMenuCard(
-                      context: context,
-                      imageAsset: 'assets/lapins_cages.jpeg',
-                      icon: AppIcons.rabbit,
-                      title: 'Mes lapins',
-                      subtitle:
-                          'Cheptel, cages et loges, reproducteurs, arbres généalogiques',
-                      badge: '${provider.totalRabbitsCount} lapins',
-                      badgeColor: AppColors.primarySoft,
-                      badgeTextColor: AppColors.primary,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RabbitListScreen(),
-                          ),
-                        );
-                      },
-                    ),
-
-                    // Card 2: Accouplements & Mises bas
-                    _buildMenuCard(
-                      context: context,
-                      icon: AppIcons.mating,
-                      imageAsset: 'assets/accouplement.webp',
-                      title: 'Accouplements & Mises bas',
-                      subtitle:
-                          'Saillies, palpation, mises bas et sevrage des lapereaux',
-                      badge:
-                          '${provider.matings.where((m) => m.isActive).length} en cours · ${provider.totalKitsInNests} lapereaux${provider.littersToWeanCount > 0 ? ' · ${provider.littersToWeanCount} à sevrer' : ''}',
-                      badgeColor: AppColors.statusPregnantBg,
-                      badgeTextColor: AppColors.statusPregnantText,
-                      onTap: () {
-                        // Des lapereaux à sevrer : on ouvre directement l'onglet des mises bas
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) => MatingsScreen(
-                                  initialTab:
-                                      provider.littersToWeanCount > 0 ? 1 : 0,
+                          // 3. Menu principal : trois carrés alignés (noir, violet, blanc)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildSquareMenuCard(
+                                  key: const ValueKey('menu-rabbits'),
+                                  imageAsset: 'assets/meslapins.webp',
+                                  title: 'Mes lapins',
+                                  detail:
+                                      '${provider.totalRabbitsCount} lapins',
+                                  background: AppColors.primary,
+                                  foreground: Colors.white,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) =>
+                                                const RabbitListScreen(),
+                                      ),
+                                    );
+                                  },
                                 ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _buildSquareMenuCard(
+                                  key: const ValueKey('menu-reproduction'),
+                                  imageAsset: 'assets/reproduction.webp',
+                                  title: 'Reproduction',
+                                  detail:
+                                      '${provider.matings.where((m) => m.isActive).length} en cours${provider.littersToWeanCount > 0 ? ' · ${provider.littersToWeanCount} à sevrer' : ''}',
+                                  background: AppColors.secondary,
+                                  foreground: Colors.white,
+                                  onTap: () {
+                                    // Des lapereaux à sevrer : on ouvre directement l'onglet des mises bas
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) => const MatingsScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _buildSquareMenuCard(
+                                  key: const ValueKey('menu-care'),
+                                  imageAsset: 'assets/veto.jpeg',
+                                  title: 'Soins & entretien',
+                                  detail: _careBadge(provider),
+                                  detailColor:
+                                      provider.pendingCareCount > 0
+                                          ? AppColors.statusAlertText
+                                          : null,
+                                  background: Colors.white,
+                                  foreground: AppColors.textPrimary,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) => const CareScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
+                          const SizedBox(height: 12),
 
-                    // Card 3: Soins & entretien
-                    _buildMenuCard(
-                      context: context,
-                      icon: AppIcons.syringe,
-                      imageAsset: 'assets/veto.jpeg',
-                      title: 'Soins & entretien',
-                      subtitle:
-                          'Vaccins, vitamines, déparasitants, historique des soins et rappels',
-                      badge: _careBadge(provider),
-                      badgeColor:
-                          provider.pendingCareCount > 0
-                              ? AppColors.statusAlertBg
-                              : AppColors.primarySoft,
-                      badgeTextColor:
-                          provider.pendingCareCount > 0
-                              ? AppColors.statusAlertText
-                              : AppColors.primary,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CareScreen(),
+                          // Card 4: Petites annonces entre éleveurs
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.storefront_outlined,
+                            title: 'Petites annonces',
+                            subtitle:
+                                'Reproducteurs, matériel, alimentation et saillies entre éleveurs',
+                            badge: '${marketplace.availableCount} annonces',
+                            badgeColor: AppColors.primarySoft,
+                            badgeTextColor: AppColors.primary,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => const MarketplaceScreen(),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
+                          const SizedBox(height: 30),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 30),
                   ],
                 ),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  /// Carrousels d'annonces posés à cheval sur la transition : le violet plein
+  /// s'arrête au milieu de la première carte ; la 1re lame du dégradé finit au
+  /// bas de la carte, les deux autres juste après. Sans annonce, seule la
+  /// vague reste.
+  Widget _buildCarouselBridge(BuildContext context) {
+    final hasAds = context.select<PromotionsProvider, bool>(
+      (p) => p.carousels.isNotEmpty,
+    );
+    if (!hasAds) return const WaveEdge(color: AppColors.secondary);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cardHeight = PromoCarouselView.cardHeight(width - 32);
+        // Le creux de la vague pleine tombe au milieu de la carte, la 1re
+        // lame s'arrête au bas de la carte, les deux autres juste après.
+        final solidHeight = cardHeight / 2 - WaveEdge.waveHeight(width);
+        final firstBlade = cardHeight / 2;
+        final bladesTotal = WaveEdge.bladeWidths(
+          firstBlade,
+        ).reduce((a, b) => a + b);
+        return Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Column(
+                children: [
+                  Container(height: solidHeight, color: AppColors.secondary),
+                  WaveEdge(color: AppColors.secondary, firstBlade: firstBlade),
+                ],
+              ),
+            ),
+            // Hauteur minimale : les lames sous la carte restent dans la section
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: cardHeight / 2 + bladesTotal,
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: PromoCarousels(),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -333,39 +414,34 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+                color: Colors.white,
                 letterSpacing: -0.5,
               ),
             ),
             const SizedBox(height: 2),
             Row(
               children: [
-                Icon(Icons.location_on, size: 14, color: Colors.grey.shade500),
+                Icon(
+                  Icons.location_on,
+                  size: 14,
+                  color: Colors.white.withAlpha(170),
+                ),
                 const SizedBox(width: 4),
-                (farmName.isEmpty)
-                    ? const Text(
-                      'Nom de ferme non défini',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey,
-                      ),
-                    )
-                    : Text(
-                      farmName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
+                Text(
+                  farmName.isEmpty ? 'Nom de ferme non défini' : farmName,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withAlpha(200),
+                  ),
+                ),
               ],
             ),
           ],
         ),
         Row(
           children: [
-            const ChatIconButton(),
+            const ChatIconButton(color: Colors.white),
             GestureDetector(
               onTap:
                   () => MainNavigationScreen.goToTab(
@@ -554,6 +630,96 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+
+  /// Carte carrée du menu principal : illustration sur un panneau clair,
+  /// titre et compteur dessous. [background] : noir, violet ou blanc.
+  Widget _buildSquareMenuCard({
+    required Key key,
+    required String imageAsset,
+    required String title,
+    required String detail,
+    required Color background,
+    required Color foreground,
+    required VoidCallback onTap,
+    Color? detailColor,
+  }) {
+    final isWhite = background == Colors.white;
+    // Fond en teinte légère (opacité réduite) pour laisser voir les images ;
+    // le texte reprend alors la couleur pleine de la carte pour rester lisible.
+    final fill = isWhite ? background : background.withAlpha(46);
+    final ink = isWhite ? foreground : background;
+    return AspectRatio(
+      key: key,
+      aspectRatio: 1,
+      child: Material(
+        color: fill,
+        borderRadius: BorderRadius.circular(AppRadius.cardLarge),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: isWhite ? Border.all(color: AppColors.cardBorder) : null,
+            ),
+            padding: const EdgeInsets.all(7),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Panneau clair : les illustrations restent lisibles sur le noir et le violet
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      // color: isWhite ? AppColors.pageBackground : Colors.white,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    padding:
+                        imageAsset.endsWith('.webp')
+                            ? const EdgeInsets.all(3)
+                            : EdgeInsets.zero,
+                    child: Image.asset(
+                      imageAsset,
+                      // Illustrations détourées entières, photos en plein cadre
+                      fit:
+                          imageAsset.endsWith('.webp')
+                              ? BoxFit.contain
+                              : BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: ink,
+                    ),
+                  ),
+                ),
+                Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: detailColor ?? ink.withAlpha(isWhite ? 150 : 190),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

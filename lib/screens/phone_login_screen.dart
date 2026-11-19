@@ -276,266 +276,327 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
+    final media = MediaQuery.of(context);
+    // Zone blanche : 30 % de la hauteur de l'écran
+    final headerHeight = media.size.height * 0.30;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: AppColors.secondary,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 24),
-                Center(
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.6, end: 1),
-                    duration: const Duration(milliseconds: 700),
-                    curve: Curves.easeOutBack,
-                    builder:
-                        (context, v, child) => Transform.scale(
-                          scale: v,
-                          child: Opacity(
-                            opacity: v.clamp(0.0, 1.0),
-                            child: child,
-                          ),
-                        ),
-                    child: Container(
-                      width: 104,
-                      height: 104,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: Colors.white, width: 1.5),
+        backgroundColor: Colors.white,
+        body: LayoutBuilder(
+          builder:
+              (context, constraints) => SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ---- Partie haute blanche ----
+                    SizedBox(
+                      height: headerHeight,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: media.padding.top),
+                        child: _buildHeader(),
                       ),
-                      padding: const EdgeInsets.all(4),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Image.asset(
-                          'assets/logo.png',
-                          fit: BoxFit.cover,
+                    ),
+
+                    // ---- Partie basse violette, bord supérieur en zigzag ----
+                    ClipPath(
+                      clipper: const _ZigzagTopClipper(),
+                      child: Container(
+                        color: AppColors.secondary,
+                        constraints: BoxConstraints(
+                          minHeight: (constraints.maxHeight - headerHeight)
+                              .clamp(0, double.infinity),
+                        ),
+                        padding: EdgeInsets.fromLTRB(
+                          24,
+                          _ZigzagTopClipper.toothHeight + 28,
+                          24,
+                          24 + media.padding.bottom,
+                        ),
+                        child: _buildForm(auth),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.6, end: 1),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutBack,
+          builder:
+              (context, v, child) => Transform.scale(
+                scale: v,
+                child: Opacity(opacity: v.clamp(0.0, 1.0), child: child),
+              ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Image.asset(
+              'assets/logo.png',
+              width: 76,
+              height: 76,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text.rich(
+          TextSpan(
+            children: const [
+              TextSpan(text: 'Clap'),
+              TextSpan(
+                text: "'in",
+                style: TextStyle(color: AppColors.secondary),
+              ),
+            ],
+            style: GoogleFonts.outfit(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Gestion intelligente & Communauté d\'éleveurs',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.outfit(fontSize: 14, color: AppColors.primary),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForm(AuthProvider auth) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Connexion rapide',
+          style: GoogleFonts.outfit(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Entrez votre numéro pour recevoir votre code de connexion par SMS.',
+          style: GoogleFonts.outfit(
+            fontSize: 14,
+            height: 1.4,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 28),
+
+        Text(
+          'Numéro de téléphone',
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Indicatif et numéro dans un seul champ
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.secondary,
+            borderRadius: BorderRadius.circular(_fieldRadius),
+            border: Border.fromBorderSide(
+              _error != null
+                  ? const BorderSide(color: Colors.white, width: 2.2)
+                  : _whiteBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: _pickCountry,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(_fieldRadius),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 10),
+                  child: Row(
+                    children: [
+                      Text(
+                        _country.code,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Container(width: 1.4, height: 28, color: Colors.white),
+              Expanded(
+                child: TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  cursorColor: Colors.white,
+                  inputFormatters: [_PhoneFormatter(_country)],
+                  onChanged: (_) {
+                    if (_error != null) setState(() => _error = null);
+                  },
+                  onSubmitted: (_) => _submitPhoneNumber(),
+                  style: GoogleFonts.outfit(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                    color: Colors.white,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: _country.hint,
+                    hintStyle: GoogleFonts.outfit(
+                      fontSize: 17,
+                      color: Colors.white.withAlpha(140),
+                    ),
+                    // Annule le fond blanc et les bordures du thème global
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 16,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  "Clap'in",
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Gestion intelligente & Communauté d\'éleveurs',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(fontSize: 15, color: Colors.white),
-                ),
-                const SizedBox(height: 48),
-
-                Text(
-                  'Connexion rapide',
-                  style: GoogleFonts.outfit(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Entrez votre numéro pour recevoir votre code de connexion par SMS.',
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    height: 1.4,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                Text(
-                  'Numéro de téléphone',
+              ),
+            ],
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _error!,
                   style: GoogleFonts.outfit(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 8),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 28),
 
-                // Indicatif et numéro dans un seul champ
-                Container(
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: BorderRadius.circular(_fieldRadius),
-                    border: Border.fromBorderSide(
-                      _error != null
-                          ? const BorderSide(color: Colors.white, width: 2.2)
-                          : _whiteBorder,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      InkWell(
-                        onTap: _pickCountry,
-                        borderRadius: const BorderRadius.horizontal(
-                          left: Radius.circular(_fieldRadius),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 16, right: 10),
-                          child: Row(
-                            children: [
-                              Text(
-                                _country.code,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(width: 1.4, height: 28, color: Colors.white),
-                      Expanded(
-                        child: TextField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          cursorColor: Colors.white,
-                          inputFormatters: [_PhoneFormatter(_country)],
-                          onChanged: (_) {
-                            if (_error != null) setState(() => _error = null);
-                          },
-                          onSubmitted: (_) => _submitPhoneNumber(),
-                          style: GoogleFonts.outfit(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                            color: Colors.white,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: _country.hint,
-                            hintStyle: GoogleFonts.outfit(
-                              fontSize: 17,
-                              color: Colors.white.withAlpha(140),
-                            ),
-                            // Annule le fond blanc et les bordures du thème global
-                            filled: false,
-                            fillColor: Colors.transparent,
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            errorBorder: InputBorder.none,
-                            disabledBorder: InputBorder.none,
-                            focusedErrorBorder: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.error_outline_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 28),
-
-                // Fond violet : bouton noir
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: auth.isLoading ? null : _submitPhoneNumber,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
-                    ),
-                    child:
-                        auth.isLoading
-                            ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                            : Text(
-                              'Recevoir le code',
-                              style: GoogleFonts.outfit(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.shield_outlined,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Connexion sécurisée sans mot de passe',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+        // Fond violet : bouton noir
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: auth.isLoading ? null : _submitPhoneNumber,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
             ),
+            child:
+                auth.isLoading
+                    ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                    : Text(
+                      'Recevoir le code',
+                      style: GoogleFonts.outfit(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
           ),
         ),
-      ),
+
+        const SizedBox(height: 32),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.shield_outlined, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              'Connexion sécurisée sans mot de passe',
+              style: GoogleFonts.outfit(fontSize: 12, color: Colors.white),
+            ),
+          ],
+        ),
+      ],
     );
   }
+}
+
+/// Découpe le bord supérieur d'une zone en dents de scie (zigzag).
+class _ZigzagTopClipper extends CustomClipper<Path> {
+  static const double toothHeight = 16;
+  static const double toothWidth = 28;
+
+  const _ZigzagTopClipper();
+
+  @override
+  Path getClip(Size size) {
+    final path = Path()..moveTo(0, toothHeight);
+    // Nombre entier de dents pour que le motif tombe juste sur les bords
+    final count = (size.width / toothWidth).round().clamp(1, 1000);
+    final w = size.width / count;
+    for (var i = 0; i < count; i++) {
+      path.lineTo(i * w + w / 2, 0);
+      path.lineTo((i + 1) * w, toothHeight);
+    }
+    path
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class OtpVerificationScreen extends StatefulWidget {

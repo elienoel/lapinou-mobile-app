@@ -36,15 +36,22 @@ class ChatProvider extends ChangeNotifier {
     if (token == null || token.isEmpty) {
       _conversations = [];
       _unreadTotal = 0;
-      notifyListeners();
+      // Appelé pendant la construction des widgets (ProxyProvider) : prévenir
+      // les écouteurs tout de suite est interdit, on le fait juste après.
+      Future.microtask(() {
+        if (!_disposed) notifyListeners();
+      });
       return;
     }
     fetchUnread();
     _unreadTimer = Timer.periodic(_unreadPollInterval, (_) => fetchUnread());
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _unreadTimer?.cancel();
     _client.close();
     super.dispose();

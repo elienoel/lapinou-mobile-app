@@ -5,7 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/currency.dart';
 import '../services/api_constants.dart';
+import '../services/auth_http_client.dart';
 import '../services/local_database.dart';
+import '../services/reminder_notifications.dart';
 import '../services/sync_service.dart';
 import '../services/validators.dart';
 
@@ -103,6 +105,10 @@ class AuthUser {
 class AuthProvider extends ChangeNotifier {
   AuthUser? _user;
   String? _token;
+
+  /// Jeton de renouvellement (90 jours) : sert à obtenir un nouveau jeton
+  /// d'accès quand celui-ci expire, sans redemander de code SMS.
+  String? _refreshToken;
   bool _isLoading = false;
   String? _errorMessage;
   String? _pendingPhoneNumber;
@@ -118,7 +124,48 @@ class AuthProvider extends ChangeNotifier {
   AppCurrency get currency => currencyByCode(_user?.currency);
 
   AuthProvider() {
+    AuthHttpClient.refreshSession = _refreshSession;
     _loadStoredSession();
+  }
+
+  void _setToken(String? token) {
+    _token = token;
+    AuthHttpClient.currentToken = token;
+  }
+
+  /// Renouvelle le jeton d'accès. Renvoie le nouveau jeton, ou null si la
+  /// session n'est plus valable (l'utilisateur est alors déconnecté). Une
+  /// coupure réseau ne déconnecte pas : la requête sera retentée plus tard.
+  Future<String?> _refreshSession() async {
+    final refresh = _refreshToken;
+    if (refresh == null || _token == null) return null;
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConstants.tokenRefreshUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh': refresh}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final payload = data is Map && data['data'] is Map ? data['data'] : data;
+        final access = payload['access'] as String?;
+        if (access == null) return null;
+        _setToken(access);
+        _refreshToken = (payload['refresh'] as String?) ?? refresh;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', access);
+        await prefs.setString('refresh_token', _refreshToken!);
+        notifyListeners();
+        return access;
+      }
+      if (response.statusCode == 401 || response.statusCode == 400) {
+        // Jeton de renouvellement expiré ou invalide : retour à la connexion
+        await logout();
+      }
+    } catch (e) {
+      debugPrint('Renouvellement de session impossible: $e');
+    }
+    return null;
   }
 
   Future<void> _loadStoredSession() async {
@@ -126,12 +173,13 @@ class AuthProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final savedToken = prefs.getString('auth_token');
       final savedUserData = prefs.getString('user_data');
+      _refreshToken = prefs.getString('refresh_token');
 
       if (savedToken != null && savedUserData != null) {
         final user = AuthUser.fromJson(jsonDecode(savedUserData));
         // Base du compte ouverte avant d'exposer la session : sinon l'écran lit la base vide
         await LocalDatabase.instance.switchToUser('${user.id}');
-        _token = savedToken;
+        _setToken(savedToken);
         _user = user;
         notifyListeners();
         refreshProfile();
@@ -217,12 +265,16 @@ class AuthProvider extends ChangeNotifier {
         final user = AuthUser.fromJson(payload['user']);
         await LocalDatabase.instance.switchToUser('${user.id}');
         await SyncService.instance.refreshPendingCount();
-        _token = payload['token'];
+        _setToken(payload['token']);
+        _refreshToken = payload['refresh'];
         _user = user;
 
         // Sauvegarder la session localement
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', _token!);
+        if (_refreshToken != null) {
+          await prefs.setString('refresh_token', _refreshToken!);
+        }
         await prefs.setString('user_data', jsonEncode(_user!.toJson()));
 
         notifyListeners();
@@ -279,8 +331,8 @@ class AuthProvider extends ChangeNotifier {
         _user = AuthUser.fromJson(data['data']);
         await _saveUser();
         notifyListeners();
-      } else if (response.statusCode == 401) {
-        // Session expirée : retour à l'écran de connexion
+      } else if (response.statusCode == 401 && _token != null) {
+        // Refusé même après un renouvellement : retour à l'écran de connexion
         await logout();
       }
     } catch (e) {
@@ -435,12 +487,16 @@ class AuthProvider extends ChangeNotifier {
 
   /// Déconnexion
   Future<void> logout() async {
-    _token = null;
+    _setToken(null);
+    _refreshToken = null;
     _user = null;
     _pendingPhoneNumber = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('refresh_token');
     await prefs.remove('user_data');
+    // Les rappels de ce compte ne doivent pas sonner pour le suivant
+    await ReminderNotifications.instance.clear();
     // Les modifications non synchronisées restent dans la base de ce compte et
     // seront envoyées à sa prochaine connexion.
     await LocalDatabase.instance.switchToUser(null);

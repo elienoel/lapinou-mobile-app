@@ -23,6 +23,10 @@ class AppColors {
   static const Color secondarySoft = Color(0xFFEFEDF4);
   static final Color secondaryTint = secondary.withAlpha(22);
 
+  /// Fond de toutes les pages : `secondary` à ~9 % d'opacité, déjà mélangé
+  /// au blanc (couleur opaque, rien ne transparaît des écrans dessous).
+  static const Color pageBackground = Color(0xFFF0EFF4);
+
   /// Dégradé de marque : du noir du logo vers le violet
   static const LinearGradient brandGradient = LinearGradient(
     begin: Alignment.topLeft,

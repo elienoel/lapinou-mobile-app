@@ -66,7 +66,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
             }).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

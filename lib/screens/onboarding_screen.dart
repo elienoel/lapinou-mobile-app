@@ -27,28 +27,28 @@ class _OnboardingPage {
 
 const List<_OnboardingPage> _pages = [
   _OnboardingPage(
-    image: 'assets/lapins_cages.jpeg',
-    title: 'Pilotez votre élevage',
+    image: 'assets/onboarding-1.webp',
+    title: 'Bienvenue sur Clap\'in',
     description:
-        'Suivez chaque lapin, chaque cage et chaque portée depuis votre téléphone, même sans connexion.',
+        'Gérez votre élevage comme un pro : chaque lapin, chaque cage et chaque portée dans votre poche, même sans connexion.',
     background: AppColors.secondary,
     buttonColor: AppColors.primary,
   ),
   _OnboardingPage(
-    image: 'assets/accouplement.webp',
-    title: 'Ne manquez aucune étape',
+    image: 'assets/onboarding-2.webp',
+    title: 'Suivez vos revenus et vos dépenses',
     description:
-        'Accouplements, mises bas, sevrages et vaccins : recevez les rappels au bon moment.',
+        'Ventes, alimentation, soins : voyez en un coup d\'œil si votre clapier est rentable.',
     background: AppColors.secondaryDark,
     buttonColor: AppColors.primary,
   ),
   _OnboardingPage(
-    image: 'assets/veto.jpeg',
-    title: 'Rejoignez la communauté',
+    image: 'assets/onboarding-3.webp',
+    title: 'Planifiez avec précision',
     description:
-        'Échangez avec d\'autres éleveurs, partagez vos conseils et trouvez les soins adaptés à vos lapins.',
-    background: AppColors.primary,
-    buttonColor: AppColors.secondary,
+        'Saillies, palpations, mises bas et vaccins : Clap\'in vous rappelle chaque étape au bon moment.',
+    background: AppColors.secondary,
+    buttonColor: AppColors.primary,
   ),
 ];
 
@@ -249,13 +249,16 @@ class _OnboardingSlide extends StatelessWidget {
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
+                // Panneau clair : l'illustration détourée (salopette violette)
+                // ne se fond pas dans le fond violet ou noir de la page.
+                // color: Colors.white,
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: Colors.white, width: 1.5),
               ),
-              padding: const EdgeInsets.all(6),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Image.asset(page.image, fit: BoxFit.cover),
+              // padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              child: Image.asset(
+                page.image,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomCenter,
               ),
             ),
           ),

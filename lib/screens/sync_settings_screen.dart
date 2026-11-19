@@ -49,7 +49,7 @@ class SyncSettingsScreen extends StatelessWidget {
                 : '${sync.pendingCount} modification${sync.pendingCount > 1 ? 's' : ''} en attente');
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         title: const Text(
           'Synchronisation',

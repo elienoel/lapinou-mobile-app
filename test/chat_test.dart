@@ -73,9 +73,17 @@ void main() {
       expect(chat.conversations.first.id, 2, reason: 'la discussion remonte en tête');
       expect(chat.conversations.first.last!.text, 'Bonjour');
 
-      chat.setToken(null); // déconnexion : tout est vidé et le suivi s'arrête
+      // Déconnexion : tout est vidé et le suivi s'arrête. setToken est appelé
+      // par le ProxyProvider pendant la construction des widgets, donc les
+      // écouteurs ne sont prévenus qu'après (sinon « called during build »).
+      var notified = 0;
+      chat.addListener(() => notified++);
+      chat.setToken(null);
       expect(chat.conversations, isEmpty);
       expect(chat.unreadTotal, 0);
+      expect(notified, 0, reason: 'pas de notification pendant setToken');
+      await Future<void>.delayed(Duration.zero);
+      expect(notified, 1, reason: 'notification juste après');
       chat.dispose();
     });
 

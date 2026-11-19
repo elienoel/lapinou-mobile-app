@@ -7,6 +7,8 @@ import 'package:clap_in/models/rabbit.dart';
 import 'package:clap_in/models/mating.dart';
 import 'package:clap_in/models/litter.dart';
 import 'package:clap_in/providers/pharmacy_provider.dart';
+import 'package:clap_in/providers/marketplace_provider.dart';
+import 'package:clap_in/providers/promotions_provider.dart';
 import 'package:clap_in/providers/rabbit_provider.dart';
 import 'package:clap_in/providers/auth_provider.dart';
 import 'package:clap_in/providers/community_provider.dart';
@@ -78,6 +80,8 @@ void main() {
           ),
           ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
           ChangeNotifierProvider<PharmacyProvider>(create: (_) => PharmacyProvider()),
+          ChangeNotifierProvider<MarketplaceProvider>(create: (_) => MarketplaceProvider()),
+          ChangeNotifierProvider<PromotionsProvider>(create: (_) => PromotionsProvider()),
         ],
         child: const MaterialApp(home: HomeDashboardScreen()),
       ),
@@ -88,7 +92,7 @@ void main() {
     expect(find.text('Résumé de l\'activité'), findsOneWidget);
     expect(find.text('Mes lapins'), findsOneWidget);
     // Accouplements et mises bas sont regroupés sur une seule carte / une seule page
-    expect(find.text('Accouplements & Mises bas'), findsOneWidget);
+    expect(find.text('Reproduction'), findsOneWidget);
     // La communauté vit dans la barre de navigation du bas, plus dans le menu principal
     expect(find.text('Communauté d\'éleveurs'), findsNothing);
     expect(find.text('Soins & entretien'), findsOneWidget);
@@ -109,6 +113,8 @@ void main() {
           ),
           ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
           ChangeNotifierProvider<PharmacyProvider>(create: (_) => PharmacyProvider()),
+          ChangeNotifierProvider<MarketplaceProvider>(create: (_) => MarketplaceProvider()),
+          ChangeNotifierProvider<PromotionsProvider>(create: (_) => PromotionsProvider()),
         ],
         child: const MaterialApp(home: MainNavigationScreen()),
       ),

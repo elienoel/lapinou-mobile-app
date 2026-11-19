@@ -1,6 +1,7 @@
 import '../widgets/app_ui.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,7 @@ import '../services/sync_service.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/author_avatar.dart';
+import '../widgets/wave_edge.dart';
 import 'settings_screen.dart';
 
 /// Profil de l'éleveur : photo, informations personnelles, statistiques et gestion du compte.
@@ -232,44 +234,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final rabbits = context.watch<RabbitProvider>();
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'Mon profil',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Paramètres',
-            icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
-            onPressed:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
+    final topInset = MediaQuery.of(context).padding.top;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Icônes de la barre d'état en blanc sur le haut violet
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(user),
-              const SizedBox(height: 16),
-              _buildStats(rabbits),
-              const SizedBox(height: 16),
-              _buildPersonalInfo(user),
-              const SizedBox(height: 16),
-              _buildAccountCard(user),
+              // ---- Haut violet : identité et statistiques ----
+              Container(
+                color: AppColors.secondary,
+                padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: _buildSettingsButton(),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildHeader(user),
+                    const SizedBox(height: 24),
+                    _buildStats(rabbits),
+                  ],
+                ),
+              ),
+              const WaveEdge(color: AppColors.secondary),
+
+              // ---- Bas blanc : le compte ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Compte',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildPersonalInfo(user),
+                    const Divider(height: 1),
+                    _buildAccountCard(user),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -277,135 +295,218 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _card({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  /// Bouton « Paramètres » en pastille, en haut à droite.
+  Widget _buildSettingsButton() {
+    return Tooltip(
+      message: 'Paramètres',
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          shape: const StadiumBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+        ),
+        onPressed:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+        icon: const Icon(Icons.settings_outlined, size: 18),
+        label: const Text('Paramètres'),
       ),
+    );
+  }
+
+  /// Ligne de liste pleine largeur : icône, libellé, et chevron si elle mène quelque part.
+  Widget _menuRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    VoidCallback? onTap,
+    Color color = AppColors.textPrimary,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, size: 26, color: color),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: color,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (onTap != null)
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 28,
+                color: AppColors.textPrimary,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Section à plat de la partie « Compte » (lignes séparées par des traits).
+  Widget _card({required Widget child}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: child,
     );
   }
 
+  /// Identité sur le haut violet : photo (modifiable), nom, élevage et lieu.
   Widget _buildHeader(AuthUser user) {
-    return _card(
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: _isUploadingPhoto ? null : () => _showPhotoOptions(user),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                AuthorAvatar(
-                  // La clé force le rechargement quand l'URL de la photo change
-                  key: ValueKey(user.avatar),
-                  name: user.displayName,
-                  url: user.avatar,
-                  radius: 52,
-                ),
-                if (_isUploadingPhoto)
+    final fullName = [
+      user.firstName,
+      user.lastName,
+    ].where((e) => e != null && e.isNotEmpty).join(' ');
+    const avatarRadius = 44.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            GestureDetector(
+              onTap: _isUploadingPhoto ? null : () => _showPhotoOptions(user),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
                   Container(
-                    width: 104,
-                    height: 104,
+                    padding: const EdgeInsets.all(3),
                     decoration: const BoxDecoration(
-                      color: Colors.black38,
+                      color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
-                      child: SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
+                    child: AuthorAvatar(
+                      // La clé force le rechargement quand l'URL de la photo change
+                      key: ValueKey(user.avatar),
+                      name: user.displayName,
+                      url: user.avatar,
+                      radius: avatarRadius,
+                    ),
+                  ),
+                  if (_isUploadingPhoto)
+                    Container(
+                      width: avatarRadius * 2,
+                      height: avatarRadius * 2,
+                      decoration: const BoxDecoration(
+                        color: Colors.black38,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.photo_camera,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fullName.isEmpty ? user.displayName : fullName,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                      height: 1.15,
+                    ),
+                  ),
+                  if (user.farmName != null && user.farmName!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        user.farmName!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
                     ),
-                  ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                  if (user.location != null && user.location!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        user.location!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withAlpha(200),
+                        ),
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.photo_camera,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (user.bio != null && user.bio!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Text(
+              user.bio!,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withAlpha(220),
+                height: 1.4,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            [
-                  user.firstName,
-                  user.lastName,
-                ].where((e) => e != null && e.isNotEmpty).join(' ').isEmpty
-                ? user.displayName
-                : [
-                  user.firstName,
-                  user.lastName,
-                ].where((e) => e != null && e.isNotEmpty).join(' '),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          if (user.farmName != null && user.farmName!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                user.farmName!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          if (user.location != null && user.location!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                user.location!,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-          if (user.bio != null && user.bio!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(
-                user.bio!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-            ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -436,7 +537,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    return _card(
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F2F2),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
       child: Row(
         children: [
           stat('${rabbits.totalRabbitsCount}', 'Lapins'),
@@ -691,61 +797,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Lignes du compte, séparées par des traits comme une liste de réglages.
   Widget _buildAccountCard(AuthUser user) {
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Mon compte',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
-            title: Text(user.phoneNumber ?? '—'),
-            subtitle: const Text('Numéro de connexion (non modifiable)'),
-          ),
-          if (user.createdAt != null)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(
-                Icons.event_available_outlined,
-                color: AppColors.primary,
-              ),
-              title: Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _menuRow(
+          icon: Icons.phone_outlined,
+          title: user.phoneNumber ?? '—',
+          subtitle: 'Numéro de connexion (non modifiable)',
+        ),
+        if (user.createdAt != null) ...[
+          const Divider(height: 1),
+          _menuRow(
+            icon: Icons.event_available_outlined,
+            title:
                 'Membre depuis le ${DateFormat('d MMMM yyyy', 'fr_FR').format(user.createdAt!.toLocal())}',
-              ),
-            ),
-          const Divider(),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.logout_rounded, color: AppColors.primary),
-            title: const Text('Se déconnecter'),
-            onTap: _confirmLogout,
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(
-              Icons.delete_forever_outlined,
-              color: Colors.redAccent,
-            ),
-            title: const Text(
-              'Supprimer mon compte',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-            subtitle: const Text(
-              'Efface définitivement votre élevage et vos publications',
-            ),
-            onTap: _confirmDeleteAccount,
           ),
         ],
-      ),
+        const Divider(height: 1),
+        _menuRow(
+          icon: Icons.logout_rounded,
+          title: 'Se déconnecter',
+          onTap: _confirmLogout,
+        ),
+        const Divider(height: 1),
+        _menuRow(
+          icon: Icons.delete_forever_outlined,
+          title: 'Supprimer mon compte',
+          subtitle: 'Efface définitivement votre élevage et vos publications',
+          color: Colors.redAccent,
+          onTap: _confirmDeleteAccount,
+        ),
+      ],
     );
   }
 }

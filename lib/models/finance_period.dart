@@ -2,78 +2,94 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'finance_transaction.dart';
 
-/// Périodes proposées pour filtrer et totaliser les finances.
-enum FinancePeriodKind { all, thisMonth, lastMonth, thisYear, custom }
+/// Types de période pour filtrer et totaliser les finances.
+enum FinancePeriodKind { all, month, year, custom }
 
-/// Période d'analyse des finances. Les bornes sont des jours entiers, incluses.
+/// Période d'analyse des finances : un mois (le filtre affiché sur la page),
+/// une année, une plage libre, ou tout l'historique. Les bornes sont des jours
+/// entiers, incluses.
 class FinancePeriod {
   final FinancePeriodKind kind;
+
+  /// Premier jour du mois ou de l'année ([FinancePeriodKind.month] / [FinancePeriodKind.year])
+  final DateTime? start;
 
   /// Bornes choisies par l'utilisateur (uniquement pour [FinancePeriodKind.custom])
   final DateTimeRange? custom;
 
-  const FinancePeriod(this.kind, {this.custom});
+  const FinancePeriod._(this.kind, {this.start, this.custom});
 
-  static const all = FinancePeriod(FinancePeriodKind.all);
+  static const all = FinancePeriod._(FinancePeriodKind.all);
 
-  factory FinancePeriod.custom(DateTimeRange range) => FinancePeriod(
+  factory FinancePeriod.month(int year, int month) =>
+      FinancePeriod._(FinancePeriodKind.month, start: DateTime(year, month));
+
+  /// Le mois en cours.
+  factory FinancePeriod.thisMonth([DateTime? now]) {
+    final d = now ?? DateTime.now();
+    return FinancePeriod.month(d.year, d.month);
+  }
+
+  factory FinancePeriod.year(int year) =>
+      FinancePeriod._(FinancePeriodKind.year, start: DateTime(year));
+
+  factory FinancePeriod.custom(DateTimeRange range) => FinancePeriod._(
     FinancePeriodKind.custom,
     custom: DateTimeRange(start: _day(range.start), end: _day(range.end)),
   );
 
+  /// Les [count] derniers mois, du mois en cours au plus ancien.
+  static List<FinancePeriod> recentMonths(int count, [DateTime? now]) {
+    final d = now ?? DateTime.now();
+    return [
+      for (var i = 0; i < count; i++) FinancePeriod.month(d.year, d.month - i),
+    ];
+  }
+
   static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// Bornes de la période ; null quand elle couvre tout l'historique.
-  DateTimeRange? range([DateTime? now]) {
-    final today = _day(now ?? DateTime.now());
+  DateTimeRange? range() {
     switch (kind) {
       case FinancePeriodKind.all:
         return null;
-      case FinancePeriodKind.thisMonth:
+      case FinancePeriodKind.month:
         return DateTimeRange(
-          start: DateTime(today.year, today.month, 1),
-          end: DateTime(today.year, today.month + 1, 0),
+          start: start!,
+          end: DateTime(start!.year, start!.month + 1, 0),
         );
-      case FinancePeriodKind.lastMonth:
-        return DateTimeRange(
-          start: DateTime(today.year, today.month - 1, 1),
-          end: DateTime(today.year, today.month, 0),
-        );
-      case FinancePeriodKind.thisYear:
-        return DateTimeRange(
-          start: DateTime(today.year, 1, 1),
-          end: DateTime(today.year, 12, 31),
-        );
+      case FinancePeriodKind.year:
+        return DateTimeRange(start: start!, end: DateTime(start!.year, 12, 31));
       case FinancePeriodKind.custom:
         return custom;
     }
   }
 
-  bool contains(DateTime date, [DateTime? now]) {
-    final r = range(now);
+  bool contains(DateTime date) {
+    final r = range();
     if (r == null) return true;
     final d = _day(date);
     return !d.isBefore(r.start) && !d.isAfter(r.end);
   }
 
+  /// « Novembre 2026 », « Année 2026 », « Du 01/01/2026 au 15/08/2026 », « Tout ».
   String get label {
     switch (kind) {
       case FinancePeriodKind.all:
         return 'Tout';
-      case FinancePeriodKind.thisMonth:
-        return 'Ce mois';
-      case FinancePeriodKind.lastMonth:
-        return 'Mois dernier';
-      case FinancePeriodKind.thisYear:
-        return 'Cette année';
+      case FinancePeriodKind.month:
+        final m = DateFormat('MMMM yyyy', 'fr_FR').format(start!);
+        return '${m[0].toUpperCase()}${m.substring(1)}';
+      case FinancePeriodKind.year:
+        return 'Année ${start!.year}';
       case FinancePeriodKind.custom:
-        return 'Personnalisé';
+        return describe();
     }
   }
 
   /// « Du 01/09/2026 au 30/09/2026 », ou « Depuis le début » pour tout l'historique.
-  String describe([DateTime? now]) {
-    final r = range(now);
+  String describe() {
+    final r = range();
     if (r == null) return 'Depuis le début';
     final f = DateFormat('dd/MM/yyyy');
     return r.start == r.end
@@ -83,10 +99,13 @@ class FinancePeriod {
 
   @override
   bool operator ==(Object other) =>
-      other is FinancePeriod && other.kind == kind && other.custom == custom;
+      other is FinancePeriod &&
+      other.kind == kind &&
+      other.start == start &&
+      other.custom == custom;
 
   @override
-  int get hashCode => Object.hash(kind, custom);
+  int get hashCode => Object.hash(kind, start, custom);
 }
 
 /// Totaux d'une liste de transactions.

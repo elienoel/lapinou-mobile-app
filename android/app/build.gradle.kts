@@ -7,12 +7,15 @@ plugins {
 
 android {
     namespace = "dev.clapin.elienoel"
-    compileSdk = flutter.compileSdkVersion
+    // 35 minimum : requis par flutter_local_notifications
+    compileSdk = maxOf(flutter.compileSdkVersion, 35)
     ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // Requis par flutter_local_notifications (notifications programmées)
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -41,4 +44,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

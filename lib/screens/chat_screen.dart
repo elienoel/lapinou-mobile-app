@@ -450,7 +450,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     ].join(' · ');
 
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBackground,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(

@@ -80,7 +80,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         title: const Text(
           'Nouvelle discussion',

@@ -1,7 +1,8 @@
 enum MatingStatus {
   pending, // Accouplement récent, en attente de palpation
   confirmed, // Gestation confirmée
-  kindled, // Mise bas effectuée
+  kindled, // Mise bas effectuée (portée au nid)
+  completed, // Portée sevrée, accouplement clôturé : réussi
   failed, // Non gestante / saut infructueux
 }
 
@@ -16,6 +17,9 @@ class Mating {
   /// Date à laquelle la palpation a été effectuée (null tant qu'elle n'est pas confirmée)
   final DateTime? palpationDoneAt;
 
+  /// Date à laquelle la boîte à nid a été posée (null tant qu'elle ne l'est pas)
+  final DateTime? nestBoxDoneAt;
+
   /// Une mise bas ne peut pas être enregistrée moins de 21 jours après la saillie
   static const int minGestationDays = 21;
 
@@ -27,6 +31,7 @@ class Mating {
     this.status = MatingStatus.pending,
     this.notes,
     this.palpationDoneAt,
+    this.nestBoxDoneAt,
   });
 
   Mating copyWith({
@@ -37,6 +42,7 @@ class Mating {
     String? notes,
     bool clearNotes = false,
     DateTime? palpationDoneAt,
+    DateTime? nestBoxDoneAt,
   }) {
     return Mating(
       id: id,
@@ -46,12 +52,19 @@ class Mating {
       status: status ?? this.status,
       notes: clearNotes ? null : (notes ?? this.notes),
       palpationDoneAt: palpationDoneAt ?? this.palpationDoneAt,
+      nestBoxDoneAt: nestBoxDoneAt ?? this.nestBoxDoneAt,
     );
   }
 
   /// Gestation en cours (pas encore de mise bas ni d'échec)
   bool get isActive =>
       status == MatingStatus.pending || status == MatingStatus.confirmed;
+
+  /// Suivi en cours : de la saillie jusqu'à la clôture (ni réussi, ni échoué)
+  bool get isOngoing =>
+      status != MatingStatus.completed && status != MatingStatus.failed;
+
+  bool get nestBoxDone => nestBoxDoneAt != null;
 
   bool get palpationDone =>
       status == MatingStatus.confirmed || palpationDoneAt != null;
@@ -103,6 +116,8 @@ class Mating {
         return 'Gestante confirmée (J$gestationDay)';
       case MatingStatus.kindled:
         return 'Mise bas réalisée';
+      case MatingStatus.completed:
+        return 'Réussi';
       case MatingStatus.failed:
         return 'Infructueux';
     }
@@ -117,6 +132,9 @@ class Mating {
         break;
       case 'kindled':
         s = MatingStatus.kindled;
+        break;
+      case 'completed':
+        s = MatingStatus.completed;
         break;
       case 'failed':
         s = MatingStatus.failed;
@@ -141,6 +159,10 @@ class Mating {
       palpationDoneAt:
           json['palpation_done_at'] != null
               ? DateTime.tryParse(json['palpation_done_at'].toString())
+              : null,
+      nestBoxDoneAt:
+          json['nest_box_done_at'] != null
+              ? DateTime.tryParse(json['nest_box_done_at'].toString())
               : null,
     );
   }

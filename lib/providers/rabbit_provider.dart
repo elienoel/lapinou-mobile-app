@@ -44,16 +44,22 @@ class RabbitProvider extends ChangeNotifier {
     // Initial state is empty, synced with Django backend
   }
 
+  /// Appelé par le ProxyProvider de `main.dart` pendant la construction des
+  /// widgets : le chargement, la synchro et le vidage notifient leurs écouteurs,
+  /// ce qui est interdit en pleine construction. On les lance donc juste après.
   void setToken(String? token) {
     if (_token != token) {
       _token = token;
       SyncService.instance.setToken(token);
-      if (token != null && token.isNotEmpty) {
-        fetchAll(token: token);
-        SyncService.instance.syncNow();
-      } else {
-        _clearInMemoryData();
-      }
+      Future.microtask(() {
+        if (_token != token) return; // jeton changé entre-temps
+        if (token != null && token.isNotEmpty) {
+          fetchAll(token: token);
+          SyncService.instance.syncNow();
+        } else {
+          _clearInMemoryData();
+        }
+      });
     }
   }
 
@@ -661,6 +667,48 @@ class RabbitProvider extends ChangeNotifier {
     }, token: token);
   }
 
+  /// Enregistre la pose de la boîte à nid à la date [doneAt] (pendant la gestation).
+  Future<String?> confirmNestBox(
+    Mating mating, {
+    DateTime? doneAt,
+    String? token,
+  }) {
+    if (!mating.isActive) {
+      return Future.value('La boîte à nid se pose pendant la gestation.');
+    }
+    final d = doneAt ?? DateTime.now();
+    return _matingAction(ApiConstants.matingNestBoxUrl(mating.id), {
+      'done_at':
+          '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+    }, token: token);
+  }
+
+  /// Clôture l'accouplement comme réussi, une fois la portée entièrement sevrée.
+  Future<String?> completeMating(Mating mating, {String? token}) {
+    final litter = litterOfMating(mating.id);
+    if (mating.status != MatingStatus.kindled || litter == null) {
+      return Future.value("L'accouplement se clôture après la mise bas.");
+    }
+    if (litter.kitsRemaining > 0) {
+      return Future.value(
+        'Il reste ${litter.kitsRemaining} lapereau(x) à sevrer.',
+      );
+    }
+    return _matingAction(
+      ApiConstants.matingCompleteUrl(mating.id),
+      const {},
+      token: token,
+    );
+  }
+
+  /// Portée issue de cet accouplement (null tant qu'il n'y a pas eu de mise bas).
+  Litter? litterOfMating(String matingId) {
+    for (final l in _litters) {
+      if (l.matingId == matingId) return l;
+    }
+    return null;
+  }
+
   Future<String?> _matingAction(
     String url,
     Map<String, dynamic> body, {
@@ -1139,7 +1187,9 @@ class RabbitProvider extends ChangeNotifier {
   Future<String?> deleteLitter(Litter litter) async {
     _litters.removeWhere((l) => l.id == litter.id);
     final mating = getMatingById(litter.matingId);
-    if (mating != null && mating.status == MatingStatus.kindled) {
+    if (mating != null &&
+        (mating.status == MatingStatus.kindled ||
+            mating.status == MatingStatus.completed)) {
       final reverted = mating.copyWith(
         status:
             mating.palpationDone
@@ -1256,6 +1306,12 @@ class RabbitProvider extends ChangeNotifier {
   @visibleForTesting
   void setLittersForTesting(List<Litter> litters) {
     _litters = List.of(litters);
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setMatingsForTesting(List<Mating> matings) {
+    _matings = List.of(matings);
     notifyListeners();
   }
 

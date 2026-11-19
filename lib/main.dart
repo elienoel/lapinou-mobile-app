@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
@@ -7,19 +8,32 @@ import 'providers/community_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/pharmacy_provider.dart';
+import 'providers/marketplace_provider.dart';
+import 'providers/promotions_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/phone_login_screen.dart';
+import 'services/auth_http_client.dart';
+import 'services/reminder_notifications.dart';
 import 'services/sync_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/colors.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('fr_FR', null);
-  SyncService.instance.start();
-  runApp(const ClapInApp());
+void main() {
+  // Toutes les requêtes HTTP de l'app passent par ce client : il renouvelle
+  // la session expirée et rejoue la requête, sans déconnecter l'éleveur.
+  // Le vrai client est créé hors de la zone, sinon il se renverrait à lui-même.
+  final inner = http.Client();
+  // Tout le démarrage se fait dans la zone du client : Flutter exige que
+  // `ensureInitialized` et `runApp` s'exécutent dans la même zone.
+  http.runWithClient(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await initializeDateFormatting('fr_FR', null);
+    await ReminderNotifications.instance.init();
+    SyncService.instance.start();
+    runApp(const ClapInApp());
+  }, () => AuthHttpClient(inner));
 }
 
 class ClapInApp extends StatelessWidget {
@@ -46,6 +60,13 @@ class ClapInApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProvider(create: (_) => PharmacyProvider()),
+        ChangeNotifierProvider(create: (_) => PromotionsProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, MarketplaceProvider>(
+          create: (_) => MarketplaceProvider(),
+          update:
+              (_, auth, market) =>
+                  (market ?? MarketplaceProvider())..setToken(auth.token),
+        ),
         ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create: (_) => ChatProvider(),
           update:

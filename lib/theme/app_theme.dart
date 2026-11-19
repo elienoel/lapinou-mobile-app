@@ -28,8 +28,8 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
-      // Toutes les pages, feuilles et boîtes de dialogue ont un fond blanc
-      scaffoldBackgroundColor: AppColors.scaffoldBackground,
+      // Toutes les pages ont un fond violet léger ; feuilles et boîtes de dialogue restent blanches
+      scaffoldBackgroundColor: AppColors.pageBackground,
       canvasColor: Colors.white,
       // Couleur primaire : noir. Couleur secondaire : violet (#6A5F8C).
       colorScheme: ColorScheme.fromSeed(
@@ -56,7 +56,7 @@ class AppTheme {
       ),
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.pageBackground,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         elevation: 0,

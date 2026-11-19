@@ -20,6 +20,7 @@ class ApiConstants {
   static String get requestOtpUrl => '$baseUrl/auth/request-otp/';
   static String get verifyOtpUrl => '$baseUrl/auth/verify-otp/';
   static String get currentUserUrl => '$baseUrl/auth/users/me/';
+  static String get tokenRefreshUrl => '$baseUrl/auth/token/refresh/';
 
   static String get postsUrl => '$baseUrl/community/posts/';
   static String postDetailUrl(int postId) =>
@@ -30,6 +31,14 @@ class ApiConstants {
       '$baseUrl/community/comments/$commentId/react/';
   static String postLikeUrl(int postId) =>
       '$baseUrl/community/posts/$postId/like/';
+
+  // Petites annonces entre éleveurs
+  static String get marketplaceUrl => '$baseUrl/community/marketplace/';
+  static String marketplaceDetailUrl(int id) =>
+      '$baseUrl/community/marketplace/$id/';
+
+  // Carrousels d'annonces de l'accueil
+  static String get promoCarouselsUrl => '$baseUrl/promotions/carousels/';
 
   // Messagerie privée
   static String get chatConversationsUrl => '$baseUrl/chat/conversations/';
@@ -75,6 +84,10 @@ class ApiConstants {
       '$baseUrl/farm/matings/$id/palpation/';
   static String matingCancelUrl(String id) =>
       '$baseUrl/farm/matings/$id/cancel/';
+  static String matingNestBoxUrl(String id) =>
+      '$baseUrl/farm/matings/$id/nest-box/';
+  static String matingCompleteUrl(String id) =>
+      '$baseUrl/farm/matings/$id/complete/';
 
   static String get littersUrl => '$baseUrl/farm/litters/';
   static String litterDetailUrl(String id) => '$baseUrl/farm/litters/$id/';

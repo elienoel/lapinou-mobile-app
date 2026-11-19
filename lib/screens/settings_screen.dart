@@ -25,7 +25,7 @@ class SettingsScreen extends StatelessWidget {
             : 'À jour';
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         title: const Text(
           'Paramètres',

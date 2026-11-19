@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/rabbit_provider.dart';
+import '../services/breeding_notifications.dart';
+import '../services/reminder_notifications.dart';
 import '../theme/colors.dart';
 import 'home_dashboard_screen.dart';
 import 'community_feed_screen.dart';
@@ -11,7 +15,9 @@ class MainNavigationScreen extends StatefulWidget {
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 
-  /// Index de l'onglet Profil
+  /// Index des onglets
+  static const int communityTab = 1;
+  static const int financesTab = 2;
   static const int profileTab = 3;
 
   /// Bascule vers un onglet depuis un écran enfant (ex. l'avatar de l'accueil ouvre le profil).
@@ -24,6 +30,33 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  RabbitProvider? _rabbits;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rappels d'élevage : autorisation demandée une fois connecté, puis
+    // reprogrammés à chaque changement des données d'élevage.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ReminderNotifications.instance.requestPermission();
+      _rabbits =
+          context.read<RabbitProvider>()..addListener(_scheduleReminders);
+      _scheduleReminders();
+    });
+  }
+
+  @override
+  void dispose() {
+    _rabbits?.removeListener(_scheduleReminders);
+    super.dispose();
+  }
+
+  void _scheduleReminders() {
+    final provider = _rabbits;
+    if (provider == null) return;
+    ReminderNotifications.instance.schedule(breedingNotifications(provider));
+  }
 
   void _onTabSelected(int index) {
     setState(() {

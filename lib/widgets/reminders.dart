@@ -61,6 +61,20 @@ class ReminderItem {
   }
 }
 
+/// « La mise bas de Bella aura lieu dans 3 jours : pensez à poser la boîte à nid. »
+String _nestBoxHint(String female, DateTime kindling) {
+  final d = _daysUntil(kindling);
+  final when =
+      d > 1
+          ? 'aura lieu dans $d jours'
+          : d == 1
+          ? 'aura lieu demain'
+          : d == 0
+          ? "est prévue aujourd'hui"
+          : 'était prévue il y a ${-d} j';
+  return 'La mise bas de $female $when : pensez à poser la boîte à nid.';
+}
+
 int _daysUntil(DateTime date) {
   final today = DateTime.now();
   final day = DateTime(today.year, today.month, today.day);
@@ -101,9 +115,32 @@ List<ReminderItem> buildReminders(RabbitProvider provider) {
           onViewDetail:
               (context, p) => Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const MatingsScreen(initialTab: 0),
-                ),
+                MaterialPageRoute(builder: (_) => const MatingsScreen()),
+              ),
+        ),
+      );
+    }
+    if (!m.nestBoxDone) {
+      items.add(
+        ReminderItem(
+          icon: Icons.inbox_outlined,
+          bg: AppColors.statusPregnantBg,
+          fg: AppColors.statusPregnantText,
+          title: 'Boîte à nid à poser',
+          subtitle: _nestBoxHint(female, m.expectedKindlingDate),
+          actionLabel: 'Boîte à nid posée',
+          daysUntilDue: _daysUntil(m.nestBoxDate),
+          onAction: (context, p) => confirmMatingNestBox(context, p, m),
+          detail:
+              'La mise bas de $female × $male aura lieu dans environ 3 jours '
+              '(attendue vers le ${_dateFmt.format(m.expectedKindlingDate)}).'
+              '\n\nInstallez la boîte à nid garnie de paille ou de copeaux '
+              'propres pour permettre à la femelle de préparer son nid avant la mise bas.',
+          viewLabel: 'Voir les accouplements',
+          onViewDetail:
+              (context, p) => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MatingsScreen()),
               ),
         ),
       );
@@ -130,9 +167,7 @@ List<ReminderItem> buildReminders(RabbitProvider provider) {
           onViewDetail:
               (context, p) => Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const MatingsScreen(initialTab: 0),
-                ),
+                MaterialPageRoute(builder: (_) => const MatingsScreen()),
               ),
         ),
       );

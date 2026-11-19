@@ -10,6 +10,8 @@ import 'package:clap_in/services/connectivity_service.dart';
 import 'package:clap_in/models/mating.dart';
 import 'package:clap_in/providers/auth_provider.dart';
 import 'package:clap_in/providers/rabbit_provider.dart';
+import 'package:clap_in/models/litter.dart';
+import 'package:clap_in/screens/mating_detail_screen.dart';
 import 'package:clap_in/screens/matings_screen.dart';
 import 'package:clap_in/widgets/litter_form.dart';
 
@@ -41,7 +43,8 @@ class _Api {
         }
         if (req.method == 'POST' && req.url.path.contains('/matings/')) {
           final id = req.url.pathSegments[req.url.pathSegments.length - 3];
-          final palpation = req.url.path.endsWith('/palpation/');
+          final step = req.url.pathSegments[req.url.pathSegments.length - 2];
+          final today = _iso(DateTime.now());
           return http.Response(
             jsonEncode({
               'success': true,
@@ -50,8 +53,13 @@ class _Api {
                 'male': 'p-m-2',
                 'female': 'p-f-2',
                 'mating_date': _iso(_daysAgo(8)),
-                'status': palpation ? 'confirmed' : 'failed',
-                'palpation_done_at': palpation ? _iso(DateTime.now()) : null,
+                'status': switch (step) {
+                  'palpation' || 'nest-box' => 'confirmed',
+                  'complete' => 'completed',
+                  _ => 'failed',
+                },
+                'palpation_done_at': step == 'palpation' ? today : null,
+                'nest_box_done_at': step == 'nest-box' ? today : null,
               },
             }),
             200,
@@ -66,7 +74,11 @@ class _Api {
       jsonDecode(request.substring(request.indexOf('{'))) as Map<String, dynamic>;
 }
 
-Future<RabbitProvider> _pump(WidgetTester tester, {int initialTab = 0}) async {
+Future<RabbitProvider> _pump(
+  WidgetTester tester, {
+  Widget home = const MatingsScreen(),
+  void Function(RabbitProvider)? setUp,
+}) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(900, 3200);
   tester.view.devicePixelRatio = 1.0;
@@ -74,18 +86,24 @@ Future<RabbitProvider> _pump(WidgetTester tester, {int initialTab = 0}) async {
 
   // Seed : mat-1 (Bella x Flash, saillie il y a 29 j, gestation confirmée)
   //        mat-2 (Luna x Goliath, saillie il y a 8 j, en attente de palpation)
+  //        lit-1 (portée de Luna enregistrée sans accouplement, 18 j)
   final provider = RabbitProvider()..seedForTesting();
   provider.setTokenForTesting('tok');
+  setUp?.call(provider);
   await tester.pumpWidget(MultiProvider(
     providers: [
       ChangeNotifierProvider<RabbitProvider>.value(value: provider),
       ChangeNotifierProvider(create: (_) => AuthProvider()),
     ],
-    child: MaterialApp(home: MatingsScreen(initialTab: initialTab)),
+    child: MaterialApp(home: home),
   ));
   await tester.pumpAndSettle();
   return provider;
 }
+
+Future<RabbitProvider> _detail(WidgetTester tester, String matingId,
+        {void Function(RabbitProvider)? setUp}) =>
+    _pump(tester, home: MatingDetailScreen(matingId: matingId), setUp: setUp);
 
 void main() {
   setUpAll(() async {
@@ -105,6 +123,7 @@ void main() {
       expect(_mating(30, status: MatingStatus.confirmed).canRegisterKindling, isTrue);
       expect(_mating(30, status: MatingStatus.kindled).canRegisterKindling, isFalse);
       expect(_mating(30, status: MatingStatus.failed).canRegisterKindling, isFalse);
+      expect(_mating(30, status: MatingStatus.completed).canRegisterKindling, isFalse);
     });
 
     test('earliest kindling date, palpation state and palpation date parsing', () {
@@ -122,90 +141,94 @@ void main() {
       expect(parsed.palpationDoneAt, DateTime(2026, 9, 14));
       expect(parsed.palpationDone, isTrue);
       expect(parsed.copyWith(notes: 'x').palpationDoneAt, DateTime(2026, 9, 14));
+
+      final done = Mating.fromJson({
+        'id': 1, 'male': 2, 'female': 3, 'mating_date': '2026-09-01',
+        'status': 'completed', 'nest_box_done_at': '2026-09-28',
+      });
+      expect(done.status, MatingStatus.completed);
+      expect(done.nestBoxDoneAt, DateTime(2026, 9, 28));
+      expect(done.isOngoing, isFalse);
+      expect(_mating(5).isOngoing, isTrue);
+      expect(_mating(40, status: MatingStatus.kindled).isOngoing, isTrue);
     });
   });
 
-  group('combined page', () {
-    testWidgets('one page, two tabs with counts', (tester) async {
+  group('single list', () {
+    testWidgets('one page without tabs: matings and litters together', (tester) async {
       await _pump(tester);
       expect(find.text('Accouplements & Mises bas'), findsOneWidget);
-      expect(find.text('Accouplements (2)'), findsOneWidget);
-      expect(find.text('Mises bas (1)'), findsOneWidget);
-      expect(find.text('Nouvel Accouplement'), findsOneWidget);
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.text('Nouvel accouplement'), findsOneWidget);
       expect(find.byKey(const ValueKey('mating-mat-1')), findsOneWidget);
-
-      await tester.tap(find.text('Mises bas (1)'));
-      await tester.pumpAndSettle();
-      expect(find.text('Enregistrer Mise Bas'), findsOneWidget, reason: 'le bouton suit l\'onglet');
-      expect(find.text('LAPEREAUX AU NID'), findsOneWidget);
+      expect(find.byKey(const ValueKey('mating-mat-2')), findsOneWidget);
+      // ancienne portée sans accouplement : dans la même liste
       expect(find.byKey(const ValueKey('litter-lit-1')), findsOneWidget);
-    });
-
-    testWidgets('can open directly on the litters tab', (tester) async {
-      await _pump(tester, initialTab: 1);
-      expect(find.text('LAPEREAUX AU NID'), findsOneWidget);
-    });
-
-    testWidgets('running and finished matings are filtered', (tester) async {
-      await _pump(tester);
-      expect(find.text('En cours (2)'), findsOneWidget);
+      expect(find.text('En cours (3)'), findsOneWidget);
       expect(find.text('Terminés (0)'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('mating-filter-finished')));
       await tester.pumpAndSettle();
       expect(find.text('Aucun accouplement terminé.'), findsOneWidget);
     });
+
+    testWidgets('a card is a summary: names, date and countdown to kindling', (tester) async {
+      await _pump(tester);
+      final card = find.byKey(const ValueKey('mating-mat-2'));
+      expect(find.descendant(of: card, matching: find.text('Saillie le ${_fmt(_daysAgo(8))}')), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.text('J-23')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('mating-mat-1')), matching: find.text('J-2')), findsOneWidget);
+      // les actions sont dans le détail, pas sur la carte
+      expect(find.byKey(const ValueKey('palpation-positive-mat-2')), findsNothing);
+      expect(find.byKey(const ValueKey('kindle-mat-2')), findsNothing);
+    });
+
+    testWidgets('tapping a card opens its steps', (tester) async {
+      await _pump(tester);
+      await tester.tap(find.byKey(const ValueKey('mating-mat-2')));
+      await tester.pumpAndSettle();
+      expect(find.byType(MatingDetailScreen), findsOneWidget);
+      expect(find.text('Étapes'), findsOneWidget);
+      for (final step in ['Saillie', 'Palpation', 'Pose de la boîte à nid', 'Mise bas', 'Sevrage', 'Réussi']) {
+        expect(find.text(step), findsOneWidget, reason: step);
+      }
+    });
   });
 
-  group('mating card options', () {
+  group('steps in the detail', () {
     testWidgets('kindling is greyed out under 21 days, with the reason', (tester) async {
-      await _pump(tester);
-
-      // mat-2 : saillie il y a 8 jours
+      await _detail(tester, 'mat-2');
       final early = tester.widget<FilledButton>(find.byKey(const ValueKey('kindle-mat-2')));
       expect(early.onPressed, isNull);
       final earliest = _daysAgo(8).add(const Duration(days: 21));
       expect(
-        find.text('Mise bas possible à partir du ${_fmt(earliest)} (21 jours après la saillie).'),
+        find.text('Possible à partir du ${_fmt(earliest)} (21 jours après la saillie).'),
         findsOneWidget,
       );
+    });
 
-      // mat-1 : saillie il y a 29 jours
-      final ready = tester.widget<FilledButton>(find.byKey(const ValueKey('kindle-mat-1')));
-      expect(ready.onPressed, isNotNull);
+    testWidgets('kindling is possible from 21 days and opens the form on that mating', (tester) async {
+      await _detail(tester, 'mat-1');
       expect(find.byKey(const ValueKey('kindle-hint-mat-1')), findsNothing);
-    });
-
-    testWidgets('the palpation button only shows until the palpation is done', (tester) async {
-      await _pump(tester);
-      expect(find.byKey(const ValueKey('palpation-mat-2')), findsOneWidget); // en attente
-      expect(find.byKey(const ValueKey('palpation-mat-1')), findsNothing); // déjà confirmée
-      expect(find.text('Palpation effectuée'), findsWidgets);
-    });
-
-    testWidgets('the menu offers edit and cancel', (tester) async {
-      await _pump(tester);
-      // Police de test très large : le formulaire d'édition existant a besoin de plus de largeur
-      tester.view.physicalSize = const Size(1800, 3200);
-      await tester.tap(find.byKey(const ValueKey('mating-menu-mat-2')));
+      await tester.tap(find.byKey(const ValueKey('kindle-mat-1')));
       await tester.pumpAndSettle();
-      expect(find.text('Modifier'), findsOneWidget);
-      expect(find.text('Annuler la saillie'), findsOneWidget);
-
-      await tester.tap(find.text('Modifier'));
-      await tester.pumpAndSettle();
-      expect(find.text("Modifier l'accouplement"), findsOneWidget);
-      // la date de saillie est modifiable
-      expect(find.text('Date de la saillie / accouplement'), findsOneWidget);
+      expect(find.text('Enregistrer une Mise Bas'), findsOneWidget);
+      expect(find.byKey(const ValueKey('litter-mating-dropdown')), findsNothing, reason: 'accouplement imposé');
+      expect(find.textContaining('Mère : Bella'), findsOneWidget);
+      expect(tester.widget<ElevatedButton>(find.byKey(const ValueKey('litter-submit'))).onPressed, isNotNull);
     });
 
-    testWidgets('confirming the palpation records it and turns the pregnancy confirmed', (tester) async {
+    testWidgets('palpation: positive or negative only while it is pending', (tester) async {
+      await _detail(tester, 'mat-2');
+      expect(find.byKey(const ValueKey('palpation-positive-mat-2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('palpation-negative-mat-2')), findsOneWidget);
+    });
+
+    testWidgets('a positive palpation records it and confirms the pregnancy', (tester) async {
       final api = _Api();
-      final provider = await _pump(tester);
-
+      final provider = await _detail(tester, 'mat-2');
       await http.runWithClient(() async {
-        await tester.tap(find.byKey(const ValueKey('palpation-mat-2')));
+        await tester.tap(find.byKey(const ValueKey('palpation-positive-mat-2')));
         await tester.pumpAndSettle();
-        expect(find.text('Palpation effectuée').last, findsOneWidget); // titre du dialogue
         expect(find.text(_fmt(DateTime.now())), findsWidgets);
         await tester.tap(find.byKey(const ValueKey('palpation-confirm')));
         await tester.pumpAndSettle();
@@ -215,61 +238,48 @@ void main() {
       expect(post, contains('/matings/mat-2/palpation/'));
       expect(api.body(post)['done_at'], _iso(DateTime.now()));
       expect(provider.getMatingById('mat-2')!.status, MatingStatus.confirmed);
-      expect(provider.getMatingById('mat-2')!.palpationDoneAt, isNotNull);
       expect(find.text('Palpation enregistrée : gestation confirmée'), findsOneWidget);
-      expect(find.byKey(const ValueKey('palpation-mat-2')), findsNothing, reason: 'plus de bouton une fois faite');
+      expect(find.byKey(const ValueKey('palpation-positive-mat-2')), findsNothing, reason: 'étape faite');
+      expect(find.textContaining('Positive · le'), findsOneWidget);
     });
 
     testWidgets('a refused palpation shows the server message', (tester) async {
       final api = _Api()..failWith = 400;
-      await _pump(tester);
+      await _detail(tester, 'mat-2');
       await http.runWithClient(() async {
-        await tester.tap(find.byKey(const ValueKey('palpation-mat-2')));
+        await tester.tap(find.byKey(const ValueKey('palpation-positive-mat-2')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('palpation-confirm')));
         await tester.pumpAndSettle();
       }, api.client);
       expect(find.text("Cette saillie n'est plus en attente de palpation."), findsOneWidget);
-      expect(find.byKey(const ValueKey('palpation-mat-2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('palpation-positive-mat-2')), findsOneWidget);
     });
 
-    testWidgets('cancelling a mating marks it failed and moves it to the finished list', (tester) async {
+    testWidgets('a negative palpation marks the mating as not successful', (tester) async {
       final api = _Api();
-      final provider = await _pump(tester);
-
+      final provider = await _detail(tester, 'mat-2');
       await http.runWithClient(() async {
-        await tester.tap(find.byKey(const ValueKey('mating-menu-mat-2')));
+        await tester.tap(find.byKey(const ValueKey('palpation-negative-mat-2')));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Annuler la saillie'));
-        await tester.pumpAndSettle();
-        expect(find.text('Annuler la saillie ?'), findsOneWidget);
-        await tester.enterText(find.byKey(const ValueKey('cancel-reason')), 'Non gestante à la palpation');
+        expect(find.text("Déclarer l'échec ?"), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('cancel-confirm')));
         await tester.pumpAndSettle();
       }, api.client);
 
       final post = api.last('POST');
       expect(post, contains('/matings/mat-2/cancel/'));
-      expect(api.body(post), {'reason': 'Non gestante à la palpation'});
+      expect(api.body(post), {'reason': 'Palpation négative'});
       expect(provider.getMatingById('mat-2')!.status, MatingStatus.failed);
-      expect(find.text('Saillie annulée'), findsOneWidget);
-
-      // elle quitte la liste « en cours » et apparaît dans « terminés » avec le badge Infructueux
-      expect(find.byKey(const ValueKey('mating-mat-2')), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('mating-filter-finished')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('mating-mat-2')), findsOneWidget);
-      expect(find.text('Infructueux'), findsOneWidget);
-      expect(find.byKey(const ValueKey('kindle-mat-2')), findsNothing, reason: 'plus d\'actions sur une saillie terminée');
+      expect(find.text('Non réussi'), findsOneWidget);
+      expect(find.byKey(const ValueKey('kindle-mat-2')), findsNothing, reason: 'plus d\'actions une fois échoué');
     });
 
-    testWidgets('going back from the cancel dialog changes nothing', (tester) async {
+    testWidgets('going back from the failure dialog changes nothing', (tester) async {
       final api = _Api();
-      final provider = await _pump(tester);
+      final provider = await _detail(tester, 'mat-2');
       await http.runWithClient(() async {
-        await tester.tap(find.byKey(const ValueKey('mating-menu-mat-2')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Annuler la saillie'));
+        await tester.tap(find.byKey(const ValueKey('palpation-negative-mat-2')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Retour'));
         await tester.pumpAndSettle();
@@ -278,37 +288,88 @@ void main() {
       expect(provider.getMatingById('mat-2')!.status, MatingStatus.pending);
     });
 
-    testWidgets('the kindling button opens the form on that very mating', (tester) async {
-      await _pump(tester);
-      await tester.tap(find.byKey(const ValueKey('kindle-mat-1')));
-      await tester.pumpAndSettle();
+    testWidgets('the nest box is recorded with its date', (tester) async {
+      final api = _Api();
+      final provider = await _detail(tester, 'mat-1');
+      await http.runWithClient(() async {
+        await tester.tap(find.byKey(const ValueKey('nestbox-mat-1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+      }, api.client);
+      final post = api.last('POST');
+      expect(post, contains('/matings/mat-1/nest-box/'));
+      expect(api.body(post)['done_at'], _iso(DateTime.now()));
+      expect(provider.getMatingById('mat-1')!.nestBoxDone, isTrue);
+      expect(find.byKey(const ValueKey('nestbox-mat-1')), findsNothing);
+      expect(find.textContaining('Posée le'), findsOneWidget);
+    });
 
-      expect(find.text('Enregistrer une Mise Bas'), findsOneWidget);
-      expect(find.byKey(const ValueKey('litter-mating-dropdown')), findsNothing, reason: 'accouplement imposé');
-      expect(find.textContaining('Mère : Bella'), findsOneWidget);
-      expect(find.byKey(const ValueKey('litter-birth-date')), findsOneWidget);
-      expect(find.byKey(const ValueKey('litter-too-early')), findsNothing);
-      expect(tester.widget<ElevatedButton>(find.byKey(const ValueKey('litter-submit'))).onPressed, isNotNull);
+    testWidgets('once the litter is weaned, the mating can be marked successful', (tester) async {
+      final api = _Api();
+      final provider = await _detail(tester, 'mat-1', setUp: (p) {
+        final m = p.getMatingById('mat-1')!;
+        p.setMatingsForTesting([
+          m.copyWith(status: MatingStatus.kindled),
+          p.getMatingById('mat-2')!,
+        ]);
+        p.setLittersForTesting([
+          Litter(
+            id: 'lit-9',
+            matingId: 'mat-1',
+            motherId: m.femaleId,
+            fatherId: m.maleId,
+            birthDate: _daysAgo(50),
+            bornAlive: 4,
+            weanedCount: 4,
+            weanedAt: _daysAgo(2),
+          ),
+        ]);
+      });
+      // mise bas et sevrage faits : les étapes en tiennent compte
+      expect(find.byKey(const ValueKey('wean-lit-9')), findsNothing);
+      expect(find.textContaining('Sevrage terminé le'), findsOneWidget);
+
+      await http.runWithClient(() async {
+        await tester.tap(find.byKey(const ValueKey('complete-mat-1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Marquer comme réussi').last);
+        await tester.pumpAndSettle();
+      }, api.client);
+      expect(api.last('POST'), contains('/matings/mat-1/complete/'));
+      expect(provider.getMatingById('mat-1')!.status, MatingStatus.completed);
+      expect(find.text('Accouplement terminé avec succès'), findsOneWidget);
+    });
+
+    testWidgets('the menu offers edit, failure and delete', (tester) async {
+      await _detail(tester, 'mat-2');
+      // Police de test très large : le formulaire d'édition a besoin de plus de largeur
+      tester.view.physicalSize = const Size(1800, 3200);
+      await tester.tap(find.byKey(const ValueKey('mating-menu')));
+      await tester.pumpAndSettle();
+      expect(find.text('Modifier'), findsOneWidget);
+      expect(find.text('Déclarer un échec'), findsOneWidget);
+      expect(find.text('Supprimer'), findsOneWidget);
+
+      await tester.tap(find.text('Modifier'));
+      await tester.pumpAndSettle();
+      expect(find.text("Modifier l'accouplement"), findsOneWidget);
+      expect(find.text('Date de la saillie / accouplement'), findsOneWidget);
+      expect(find.text('Statut'), findsNothing, reason: 'le statut suit les étapes');
     });
   });
 
   group('litter form checks the dates', () {
     Future<RabbitProvider> openForm(WidgetTester tester, {Mating? mating}) async {
       final provider = await _pump(tester);
-      await tester.tap(find.text('Mises bas (1)'));
-      await tester.pumpAndSettle();
-      if (mating == null) {
-        await tester.tap(find.text('Enregistrer Mise Bas'));
-      } else {
-        // formulaire ouvert directement sur un accouplement donné
-        final ctx = tester.element(find.byType(Scaffold).first);
-        showLitterForm(ctx, provider, mating: mating);
-      }
+      // sans accouplement imposé, le formulaire propose la liste des accouplements
+      final ctx = tester.element(find.byType(Scaffold).first);
+      showLitterForm(ctx, provider, mating: mating);
       await tester.pumpAndSettle();
       return provider;
     }
 
-    testWidgets('via the button, the too-early mating is greyed out in the list and not selected', (tester) async {
+    testWidgets('without a given mating, the too-early mating is greyed out in the list and not selected', (tester) async {
       await openForm(tester);
       // mat-1 (29 j) est présélectionné, mat-2 (8 j) est grisé dans la liste
       expect(find.byKey(const ValueKey('litter-too-early')), findsNothing);

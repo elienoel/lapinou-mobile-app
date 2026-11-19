@@ -1,5 +1,6 @@
 import '../utils/formatters.dart';
 import '../widgets/app_ui.dart';
+import '../widgets/banknote_display.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -26,7 +27,8 @@ class FinancesScreen extends StatefulWidget {
 
 class _FinancesScreenState extends State<FinancesScreen> {
   late int _selectedFilterIndex;
-  FinancePeriod _period = FinancePeriod.all;
+  // Par défaut : le mois en cours
+  FinancePeriod _period = FinancePeriod.thisMonth();
 
   @override
   void initState() {
@@ -34,38 +36,69 @@ class _FinancesScreenState extends State<FinancesScreen> {
     _selectedFilterIndex = widget.initialFilterIndex;
   }
 
-  /// Choisit une période prédéfinie ; « Personnalisé » ouvre un calendrier de dates début → fin.
-  Future<void> _selectPeriod(FinancePeriodKind kind) async {
-    if (kind != FinancePeriodKind.custom) {
-      setState(() => _period = FinancePeriod(kind));
-      return;
-    }
-    final now = DateTime.now();
-    final picked = await showDateRangePicker(
+  /// Ouvre le choix d'une période libre : tout l'historique, une année, ou
+  /// une plage de dates au choix.
+  Future<void> _openPeriodSheet(List<FinanceTransaction> finances) async {
+    final picked = await showModalBottomSheet<FinancePeriod>(
       context: context,
-      firstDate: DateTime(now.year - 10),
-      lastDate: DateTime(now.year + 1, 12, 31),
-      initialDateRange:
-          _period.range() ??
-          DateTimeRange(
-            start: DateTime(now.year, now.month, 1),
-            end: DateTime(now.year, now.month, now.day),
-          ),
-      helpText: 'Choisir la période',
-      saveText: 'Appliquer',
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder:
+          (_) =>
+              _PeriodSheet(current: _period, firstYear: _firstYear(finances)),
     );
-    if (picked != null && mounted) {
-      setState(() => _period = FinancePeriod.custom(picked));
-    }
+    if (picked != null && mounted) setState(() => _period = picked);
   }
 
-  Widget _buildPeriodBar() {
+  /// Année de la plus ancienne transaction (au moins 2 ans proposés).
+  static int _firstYear(List<FinanceTransaction> finances) {
+    var year = DateTime.now().year - 2;
+    for (final f in finances) {
+      if (f.date.year < year) year = f.date.year;
+    }
+    return year;
+  }
+
+  /// Mois proposés : du mois en cours jusqu'à celui de la plus ancienne
+  /// transaction (au moins 12 mois).
+  static List<FinancePeriod> _months(List<FinanceTransaction> finances) {
+    final now = DateTime.now();
+    var count = 12;
+    for (final f in finances) {
+      final back = (now.year - f.date.year) * 12 + now.month - f.date.month + 1;
+      if (back > count) count = back;
+    }
+    return FinancePeriod.recentMonths(count, now);
+  }
+
+  /// Filtre de la page : le bouton « Filtrer » (période libre), puis les mois,
+  /// du plus récent au plus ancien.
+  Widget _buildPeriodBar(List<FinanceTransaction> finances) {
+    final isMonth = _period.kind == FinancePeriodKind.month;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (final kind in FinancePeriodKind.values) ...[
-            _buildPeriodChip(kind),
+          _periodChip(
+            key: const ValueKey('period-filter'),
+            label: isMonth ? 'Filtrer' : _period.label,
+            icon: Icons.tune_rounded,
+            selected: !isMonth,
+            onTap: () => _openPeriodSheet(finances),
+          ),
+          const SizedBox(width: 8),
+          for (final month in _months(finances)) ...[
+            _periodChip(
+              key: ValueKey(
+                'period-month-${month.start!.year}-${month.start!.month}',
+              ),
+              label: month.label,
+              selected: _period == month,
+              onTap: () => setState(() => _period = month),
+            ),
             const SizedBox(width: 8),
           ],
         ],
@@ -73,15 +106,17 @@ class _FinancesScreenState extends State<FinancesScreen> {
     );
   }
 
-  Widget _buildPeriodChip(FinancePeriodKind kind) {
-    final selected = _period.kind == kind;
-    final label =
-        kind == FinancePeriodKind.custom
-            ? (selected ? _period.describe() : 'Personnalisé')
-            : FinancePeriod(kind).label;
+  Widget _periodChip({
+    required Key key,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    final fg = selected ? Colors.white : AppColors.textSecondary;
     return InkWell(
-      key: ValueKey('period-${kind.name}'),
-      onTap: () => _selectPeriod(kind),
+      key: key,
+      onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -92,13 +127,22 @@ class _FinancesScreenState extends State<FinancesScreen> {
             color: selected ? AppColors.primary : AppColors.cardBorder,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : AppColors.textSecondary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: fg),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: fg,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -112,9 +156,13 @@ class _FinancesScreenState extends State<FinancesScreen> {
   }) {
     final isEditing = existing != null;
     final titleController = TextEditingController(text: existing?.title ?? '');
-    final amountController = TextEditingController(
-      text: existing != null ? existing.amount.toString() : '',
-    );
+    final initialAmountStr =
+        existing != null
+            ? (existing.amount % 1 == 0
+                ? existing.amount.toInt().toString()
+                : existing.amount.toString())
+            : '';
+    final amountController = TextEditingController(text: initialAmountStr);
     final notesController = TextEditingController(text: existing?.notes ?? '');
     final currency = context.read<AuthProvider>().currency;
     final categoryType =
@@ -135,6 +183,9 @@ class _FinancesScreenState extends State<FinancesScreen> {
               existing.date.day,
             )
             : DateTime(now.year, now.month, now.day);
+
+    double parsedAmount =
+        double.tryParse(initialAmountStr.replaceAll(',', '.')) ?? 0.0;
 
     showModalBottomSheet(
       context: context,
@@ -158,21 +209,64 @@ class _FinancesScreenState extends State<FinancesScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        isEditing
-                            ? (isIncome
-                                ? 'Modifier la Vente'
-                                : 'Modifier la Dépense')
-                            : (isIncome
-                                ? 'Enregistrer une Vente'
-                                : 'Enregistrer une Dépense'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              isEditing
+                                  ? (isIncome
+                                      ? 'Modifier la Vente'
+                                      : 'Modifier la Dépense')
+                                  : (isIncome
+                                      ? 'Enregistrer une Vente'
+                                      : 'Enregistrer une Dépense'),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  isIncome
+                                      ? AppColors.statusActiveBg
+                                      : AppColors.statusAlertBg,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isIncome ? 'Recette (+)' : 'Dépense (-)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color:
+                                    isIncome
+                                        ? AppColors.statusActiveText
+                                        : Colors.redAccent,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
+
+                      // Label et input: Intitulé
+                      const Text(
+                        'Intitulé *',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: titleController,
                         decoration: InputDecoration(
@@ -181,9 +275,136 @@ class _FinancesScreenState extends State<FinancesScreen> {
                               isIncome
                                   ? 'Ex: Vente jeune mâle Fauve'
                                   : 'Ex: Sac granulés 25kg, Paille...',
+                          filled: true,
+                          fillColor: const Color(0xFFF7F8FA),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
                         ),
                       ),
+                      const SizedBox(height: 14),
+
+                      // Illustration des billets en fonction du montant saisi
+                      BanknoteAmountIllustration(
+                        amount: parsedAmount,
+                        isIncome: isIncome,
+                      ),
                       const SizedBox(height: 12),
+
+                      // Grand champ montant sans bordure
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F8FA),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Montant (${currency.symbol}) *',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '${currency.symbol} ',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    color:
+                                        isIncome
+                                            ? AppColors.primary
+                                            : Colors.orange.shade800,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    controller: amountController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    autofocus: !isEditing,
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w800,
+                                      color:
+                                          isIncome
+                                              ? AppColors.primary
+                                              : Colors.orange.shade900,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: 'Montant (${currency.symbol}) *',
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      filled: false,
+                                      contentPadding: EdgeInsets.zero,
+                                      hintText:
+                                          currency.decimals == 0
+                                              ? '0'
+                                              : '0.00',
+                                      hintStyle: TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    onChanged: (val) {
+                                      final v =
+                                          double.tryParse(
+                                            val.replaceAll(',', '.'),
+                                          ) ??
+                                          0.0;
+                                      setSheetState(() => parsedAmount = v);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Label et input: Date
+                      const Text(
+                        'Date *',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       InkWell(
                         key: const ValueKey('tx-date'),
                         borderRadius: BorderRadius.circular(12),
@@ -198,35 +419,72 @@ class _FinancesScreenState extends State<FinancesScreen> {
                             setSheetState(() => txDate = picked);
                           }
                         },
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Date *',
-                            prefixIcon: Icon(Icons.event_outlined, size: 20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
                           ),
-                          child: Text(formatDate(txDate)),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7F8FA),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                formatDate(txDate),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const Spacer(),
+                              const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: amountController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Montant (${currency.symbol}) *',
-                          prefixText: '${currency.symbol} ',
-                          hintText:
-                              currency.decimals == 0 ? 'Ex: 5000' : 'Ex: 35.00',
+                      const SizedBox(height: 14),
+
+                      // Label et dropdown: Catégorie
+                      const Text(
+                        'Catégorie',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
                         key: const ValueKey('tx-category'),
                         isExpanded: true,
                         value: selectedCategory,
-                        decoration: const InputDecoration(
-                          labelText: 'Catégorie',
-                          prefixIcon: Icon(Icons.sell_outlined, size: 20),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFF7F8FA),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
                         ),
                         items: [
                           for (final c in categoryOptions)
@@ -297,15 +555,46 @@ class _FinancesScreenState extends State<FinancesScreen> {
                           setSheetState(() => selectedCategory = val);
                         },
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: notesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Notes & Références (optionnel)',
-                          hintText: 'Nom de l\'acheteur, facture...',
+                      const SizedBox(height: 14),
+
+                      // Label et input: Notes & Références
+                      const Text(
+                        'Notes & Références (optionnel)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: notesController,
+                        decoration: InputDecoration(
+                          hintText: 'Nom de l\'acheteur, facture...',
+                          filled: true,
+                          fillColor: const Color(0xFFF7F8FA),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -481,7 +770,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Période d'analyse : pilote le bilan, les compteurs et la liste
-                    _buildPeriodBar(),
+                    _buildPeriodBar(provider.finances),
                     const SizedBox(height: 14),
 
                     // Top Green Banner matching "LIFE TIME SALE" from mockup
@@ -818,29 +1107,9 @@ class _FinancesScreenState extends State<FinancesScreen> {
         decoration: appCardDecoration(),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color:
-                    fin.isIncome
-                        ? AppColors.statusActiveBg
-                        : AppColors.statusAlertBg,
-                border: Border.all(
-                  color:
-                      fin.isIncome
-                          ? AppColors.statusActiveText
-                          : Colors.redAccent,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                fin.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                color:
-                    fin.isIncome
-                        ? AppColors.statusActiveText
-                        : Colors.redAccent,
-                size: 20,
-              ),
+            BanknoteStackIcon(
+              amount: fin.amount,
+              isIncome: fin.isIncome,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -879,6 +1148,183 @@ class _FinancesScreenState extends State<FinancesScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Choix d'une période libre : tout l'historique, une année, ou une plage
+/// de dates (du … au …). Renvoie la période choisie.
+class _PeriodSheet extends StatefulWidget {
+  const _PeriodSheet({required this.current, required this.firstYear});
+
+  final FinancePeriod current;
+  final int firstYear;
+
+  @override
+  State<_PeriodSheet> createState() => _PeriodSheetState();
+}
+
+class _PeriodSheetState extends State<_PeriodSheet> {
+  late DateTime _from;
+  late DateTime _to;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final r = widget.current.range();
+    _from = r?.start ?? DateTime(now.year, 1, 1);
+    _to = r?.end ?? DateTime(now.year, now.month, now.day);
+  }
+
+  Future<void> _pick(bool from) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: from ? _from : _to,
+      firstDate: DateTime(widget.firstYear - 5),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      helpText: from ? 'Date de début' : 'Date de fin',
+    );
+    if (picked == null) return;
+    setState(() {
+      if (from) {
+        _from = picked;
+        if (_to.isBefore(_from)) _to = _from;
+      } else {
+        _to = picked;
+        if (_from.isAfter(_to)) _from = _to;
+      }
+    });
+  }
+
+  Widget _option(String label, FinancePeriod period, {Key? key}) {
+    final selected = widget.current == period;
+    return ListTile(
+      key: key,
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      trailing:
+          selected
+              ? const Icon(Icons.check_rounded, color: AppColors.primary)
+              : null,
+      onTap: () => Navigator.pop(context, period),
+    );
+  }
+
+  Widget _dateField(String label, DateTime date, bool from) {
+    return Expanded(
+      child: InkWell(
+        key: ValueKey(from ? 'period-from' : 'period-to'),
+        onTap: () => _pick(from),
+        borderRadius: BorderRadius.circular(12),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: const Icon(Icons.event_outlined, size: 20),
+          ),
+          child: Text(DateFormat('dd/MM/yyyy').format(date)),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final thisYear = DateTime.now().year;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Choisir une période',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Plage de dates',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _dateField('Du', _from, true),
+                  const SizedBox(width: 10),
+                  _dateField('Au', _to, false),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  key: const ValueKey('period-apply'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: const StadiumBorder(),
+                  ),
+                  onPressed:
+                      () => Navigator.pop(
+                        context,
+                        FinancePeriod.custom(
+                          DateTimeRange(start: _from, end: _to),
+                        ),
+                      ),
+                  child: const Text('Appliquer cette plage'),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Par année',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              for (var y = thisYear; y >= widget.firstYear; y--)
+                _option(
+                  y == thisYear
+                      ? 'Cette année ($y)'
+                      : (y == thisYear - 1
+                          ? 'Année dernière ($y)'
+                          : 'Année $y'),
+                  FinancePeriod.year(y),
+                  key: ValueKey('period-year-$y'),
+                ),
+              const Divider(),
+              _option(
+                "Tout l'historique",
+                FinancePeriod.all,
+                key: const ValueKey('period-all'),
+              ),
+            ],
+          ),
         ),
       ),
     );

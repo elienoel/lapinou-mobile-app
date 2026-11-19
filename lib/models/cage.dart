@@ -76,8 +76,8 @@ class Cage {
   final String? notes;
   final List<CageCompartment> compartments;
 
-  static const int maxRows = 12;
-  static const int maxColumns = 6;
+  /// Au plus 5 étages de loges ; le nombre de colonnes n'est pas limité.
+  static const int maxRows = 5;
 
   const Cage({
     required this.id,

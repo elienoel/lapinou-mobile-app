@@ -1,6 +1,7 @@
 import '../widgets/app_ui.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -10,7 +11,8 @@ import '../providers/auth_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../services/api_constants.dart';
 import '../theme/colors.dart';
-import '../widgets/app_icon.dart';
+import '../widgets/cage_diagram.dart';
+import '../widgets/wave_edge.dart';
 
 class AddRabbitScreen extends StatefulWidget {
   final Rabbit? initialRabbitToEdit;
@@ -36,11 +38,17 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   late String _selectedColor;
   RabbitStatus _selectedStatus = RabbitStatus.active;
   DateTime _birthDate = DateTime.now().subtract(const Duration(days: 180));
+
+  /// Faux tant que la date n'a pas été choisie (nouveau lapin) : on affiche
+  /// alors le placeholder, et elle est demandée avant de passer à l'étape 2.
+  late bool _birthDateSet = widget.initialRabbitToEdit != null;
+  bool _birthDateError = false;
   String? _selectedFatherId;
   String? _selectedCageId;
   int? _selectedCompartment;
   String? _selectedMotherId;
   int _avatarColorIndex = 0;
+  int _step = 0;
   File? _pickedPhotoFile;
   bool _isSaving = false;
 
@@ -251,9 +259,11 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       },
     );
 
-    if (picked != null && picked != _birthDate) {
+    if (picked != null) {
       setState(() {
         _birthDate = picked;
+        _birthDateSet = true;
+        _birthDateError = false;
       });
     }
   }
@@ -266,10 +276,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     final typed = _cageController.text.trim();
     return typed.isEmpty || provider.cages.isNotEmpty ? 'Non assigné' : typed;
   }
-
-  /// Toutes les loges sont sélectionnables : une loge peut accueillir plusieurs lapins.
-  List<int> _selectableCompartments(Cage cage) =>
-      cage.slots.map((c) => c.number).toList();
 
   /// Loge proposée par défaut : la première loge libre, sinon la première.
   int? _defaultCompartment(Cage cage) {
@@ -291,76 +297,137 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     return '$label · ${others.map((o) => o.name).join(', ')}';
   }
 
-  Widget _buildCageSelector(List<Cage> cages) {
+  /// Étape 3 : choix de la cage, puis de la loge directement sur son schéma.
+  Widget _buildCagePicker(List<Cage> cages) {
     final cage = cages.where((c) => c.id == _selectedCageId).firstOrNull;
-    final compartments = cage == null ? <int>[] : _selectableCompartments(cage);
-    return Column(
-      children: [
-        DropdownButtonFormField<String?>(
-          isExpanded: true,
-          value: cage?.id,
-          decoration: const InputDecoration(
-            labelText: 'Cage',
-            prefixIcon: Icon(Icons.grid_view, size: 20),
+    final editedId = widget.initialRabbitToEdit?.id;
+    final provider = context.read<RabbitProvider>();
+    final kits = editedId == null ? 0 : provider.nursingKitsOf(editedId);
+
+    Widget choice({
+      required Key key,
+      required String label,
+      required bool selected,
+      required VoidCallback onTap,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          key: key,
+          label: Text(label),
+          selected: selected,
+          onSelected: (_) => onTap(),
+          showCheckmark: false,
+          selectedColor: AppColors.primary,
+          backgroundColor: AppColors.secondaryTint,
+          side: BorderSide.none,
+          labelStyle: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.textPrimary,
           ),
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('Aucune cage'),
-            ),
-            for (final c in cages)
-              DropdownMenuItem<String?>(
-                value: c.id,
-                child: Text(
-                  'Cage ${c.name} (${c.freeCount}/${c.compartmentsCount} libres)',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
-          onChanged: (id) {
-            setState(() {
-              _selectedCageId = id;
-              final picked = cages.where((c) => c.id == id).firstOrNull;
-              _selectedCompartment =
-                  picked == null ? null : _defaultCompartment(picked);
-            });
-          },
+          shape: const StadiumBorder(),
         ),
-        if (cage != null) ...[
-          const SizedBox(height: 16),
-          DropdownButtonFormField<int>(
-            isExpanded: true,
-            value:
-                compartments.contains(_selectedCompartment)
-                    ? _selectedCompartment
-                    : null,
-            decoration: const InputDecoration(
-              labelText: 'Loge',
-              prefixIcon: Icon(Icons.door_front_door_outlined, size: 20),
-            ),
-            items: [
-              for (final n in compartments)
-                DropdownMenuItem(
-                  value: n,
-                  child: Text(
-                    _compartmentOption(cage, n),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+      );
+    }
+
+    Widget diagram(Cage c) {
+      final d = CageDiagram(
+        cage: c,
+        highlightedCompartment: _selectedCompartment,
+        onCompartmentTap:
+            (slot) => setState(() => _selectedCompartment = slot.number),
+      );
+      if (c.columnsCount <= 2) return d;
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(width: c.columnsCount * 190.0, child: d),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: Row(
+            children: [
+              choice(
+                key: const ValueKey('cage-choice-none'),
+                label: 'Aucune cage',
+                selected: cage == null,
+                onTap:
+                    () => setState(() {
+                      _selectedCageId = null;
+                      _selectedCompartment = null;
+                    }),
+              ),
+              for (final c in cages)
+                choice(
+                  key: ValueKey('cage-choice-${c.id}'),
+                  label:
+                      'Cage ${c.name} · ${c.freeCount}/${c.compartmentsCount} libres',
+                  selected: c.id == cage?.id,
+                  onTap:
+                      () => setState(() {
+                        _selectedCageId = c.id;
+                        _selectedCompartment = _defaultCompartment(c);
+                      }),
                 ),
             ],
-            onChanged: (n) => setState(() => _selectedCompartment = n),
-            validator: (v) => v == null ? 'Choisissez une loge' : null,
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (cage == null)
+          const Text(
+            'Le lapin ne sera placé dans aucune cage pour le moment.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          )
+        else ...[
+          const Text(
+            'Touchez la loge où placer ce lapin.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          diagram(cage),
+          const SizedBox(height: 14),
+          // Loge retenue, avec les lapins qui y sont déjà
+          Container(
+            key: const ValueKey('selected-compartment'),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryTint,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.door_front_door_outlined,
+                  size: 20,
+                  color: AppColors.secondary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _selectedCompartment == null
+                        ? 'Aucune loge choisie'
+                        : _compartmentOption(cage, _selectedCompartment!),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           // Une lapine qui allaite déménage avec ses lapereaux (non sevrés)
-          if (widget.initialRabbitToEdit != null &&
-              context.read<RabbitProvider>().nursingKitsOf(
-                    widget.initialRabbitToEdit!.id,
-                  ) >
-                  0)
+          if (kits > 0)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Ses ${context.read<RabbitProvider>().nursingKitsOf(widget.initialRabbitToEdit!.id)} lapereaux non sevrés la suivent dans cette loge.',
+                'Ses $kits lapereaux non sevrés la suivent dans cette loge.',
                 key: const ValueKey('kits-follow-note'),
                 style: const TextStyle(
                   fontSize: 12.5,
@@ -379,7 +446,13 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   }
 
   Future<void> _saveRabbit() async {
-    if (_isSaving || !_formKey.currentState!.validate()) {
+    if (_isSaving || !(_formKey.currentState?.validate() ?? true)) {
+      return;
+    }
+    if (_nameController.text.trim().isEmpty) {
+      // Le nom est saisi à la 1re étape
+      setState(() => _step = 0);
+      _showError('Veuillez saisir un nom');
       return;
     }
 
@@ -471,566 +544,725 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     }
   }
 
+  // ---- Assistant en 3 étapes ----
+
+  static const _stepTitles = ['Identité', 'Race & origines', 'Emplacement'];
+
+  /// Passe à l'étape suivante si celle-ci est complète.
+  void _next() {
+    final formOk = _formKey.currentState?.validate() ?? true;
+    final dateOk = _step != 0 || _birthDateSet;
+    if (!dateOk) setState(() => _birthDateError = true);
+    if (!formOk || !dateOk) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _step++);
+  }
+
+  void _back() {
+    FocusScope.of(context).unfocus();
+    if (_step == 0) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _step--);
+    }
+  }
+
+  /// « 6 mois », « 1 an et 2 mois » : âge à partir de la date de naissance.
+  String _ageLabel(DateTime birth) {
+    final now = DateTime.now();
+    var months = (now.year - birth.year) * 12 + now.month - birth.month;
+    if (now.day < birth.day) months--;
+    if (months < 1) {
+      final days = now.difference(birth).inDays;
+      return '$days jour${days > 1 ? 's' : ''}';
+    }
+    final years = months ~/ 12;
+    final rest = months % 12;
+    if (years == 0) return '$months mois';
+    final y = '$years an${years > 1 ? 's' : ''}';
+    return rest == 0 ? y : '$y et $rest mois';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<RabbitProvider>(context);
+    final isEditing = widget.initialRabbitToEdit != null;
+    final topInset = MediaQuery.of(context).padding.top;
+    final onViolet = _step == 0;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: PopScope(
+        // Le retour du téléphone revient à l'étape précédente
+        canPop: _step == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _back();
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.secondary,
+          body: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildWizardHeader(isEditing, topInset),
+                Expanded(
+                  child:
+                      onViolet
+                          ? SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                            child: _buildIdentityStep(),
+                          )
+                          // Haut violet, bas blanc, avec la vague entre les deux
+                          : Container(
+                            color: Colors.white,
+                            child: Column(
+                              children: [
+                                const WaveEdge(color: AppColors.secondary),
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    physics: const BouncingScrollPhysics(),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      12,
+                                      20,
+                                      24,
+                                    ),
+                                    child:
+                                        _step == 1
+                                            ? _buildOriginsStep()
+                                            : _buildPlacementStep(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                ),
+                _buildWizardFooter(isEditing, onViolet),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// En-tête violet : retour, titre, étape courante et barre de progression.
+  Widget _buildWizardHeader(bool isEditing, double topInset) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(8, topInset + 4, 20, _step == 0 ? 16 : 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                tooltip: _step == 0 ? 'Fermer' : 'Étape précédente',
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 20,
+                  color: Colors.white,
+                ),
+                onPressed: _back,
+              ),
+              Expanded(
+                child: Text(
+                  isEditing ? 'Modifier le lapin' : 'Nouveau lapin',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Text(
+                'Étape ${_step + 1}/3',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withAlpha(200),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 12, top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _stepTitles[_step],
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      if (i > 0) const SizedBox(width: 6),
+                      Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color:
+                                i <= _step
+                                    ? Colors.white
+                                    : Colors.white.withAlpha(70),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Boutons du bas : « Retour » (à partir de l'étape 2) et « Suivant »,
+  /// ou « Enregistrer » à la dernière étape.
+  Widget _buildWizardFooter(bool isEditing, bool onViolet) {
+    final isLast = _step == 2;
+    const shape = StadiumBorder();
+    const textStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.w800);
+
+    final next = FilledButton(
+      key: ValueKey(isLast ? 'wizard-save' : 'wizard-next'),
+      onPressed: _isSaving ? null : (isLast ? _saveRabbit : _next),
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: shape,
+        textStyle: textStyle,
+      ),
+      child:
+          _isSaving
+              ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+              : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      isLast
+                          ? (isEditing ? 'Mettre à jour' : 'Enregistrer')
+                          : 'Suivant',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (!isLast) ...[
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward_rounded, size: 20),
+                  ],
+                ],
+              ),
+    );
+
+    return Container(
+      color: onViolet ? AppColors.secondary : Colors.white,
+      padding: EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        12 + MediaQuery.of(context).padding.bottom,
+      ),
+      child: SizedBox(
+        height: 54,
+        child: Row(
+          children: [
+            if (_step > 0) ...[
+              Expanded(
+                child: OutlinedButton(
+                  key: const ValueKey('wizard-back'),
+                  onPressed: _isSaving ? null : _back,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
+                    shape: shape,
+                    textStyle: textStyle,
+                    minimumSize: const Size.fromHeight(54),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_back_rounded, size: 20),
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Retour',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              flex: _step > 0 ? 2 : 1,
+              child: SizedBox(height: 54, child: next),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---- Étape 1 : photo, nom, date de naissance (sur le violet) ----
+
+  Widget _buildIdentityStep() {
+    final existingPhoto = widget.initialRabbitToEdit?.primaryPhotoUrl;
+    final hasPhoto =
+        _pickedPhotoFile != null ||
+        (existingPhoto != null && existingPhoto.isNotEmpty);
+    // Cadre : 85 % de la largeur de l'écran, au format 2,1:1
+    final frameWidth = MediaQuery.of(context).size.width * 0.85;
+    final frameHeight = frameWidth / 2.1;
+
+    Widget photoContent;
+    if (_pickedPhotoFile != null) {
+      photoContent = Image.file(_pickedPhotoFile!, fit: BoxFit.cover);
+    } else if (hasPhoto) {
+      photoContent = Image.network(
+        ApiConstants.formatMediaUrl(existingPhoto),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _photoPlaceholder(),
+      );
+    } else {
+      photoContent = _photoPlaceholder();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Cadre photo
+        Center(
+          child: Column(
+            children: [
+              GestureDetector(
+                key: const ValueKey('photo-frame'),
+                onTap: _showPhotoOptions,
+                child: Container(
+                  width: frameWidth,
+                  height: frameHeight,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(28),
+                    borderRadius: BorderRadius.circular(36),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(150),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(30),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(29),
+                    child: SizedBox.expand(child: photoContent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _showPhotoOptions,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                label: Text(
+                  hasPhoto ? 'Changer la photo' : 'Ajouter une photo',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Nom : gros texte, sans bordure ni label, sur le violet
+        TextFormField(
+          controller: _nameController,
+          textCapitalization: TextCapitalization.words,
+          cursorColor: Colors.white,
+          style: const TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Nom du lapin',
+            hintStyle: TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w800,
+              color: Colors.white.withAlpha(80),
+            ),
+            filled: true,
+            fillColor: Colors.transparent,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+            errorStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFFFD2D2),
+            ),
+          ),
+          validator:
+              (value) =>
+                  value == null || value.trim().isEmpty
+                      ? 'Veuillez saisir un nom'
+                      : null,
+        ),
+        const SizedBox(height: 24),
+
+        // Date de naissance : même style, ouvre le calendrier
+        InkWell(
+          key: const ValueKey('birth-date'),
+          onTap: _pickBirthDate,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _birthDateSet
+                        ? DateFormat('d MMMM yyyy', 'fr_FR').format(_birthDate)
+                        : 'Date de naissance',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      color:
+                          _birthDateSet
+                              ? Colors.white
+                              : Colors.white.withAlpha(80),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.edit_calendar_outlined,
+                  color: Colors.white.withAlpha(200),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_birthDateSet)
+          Text(
+            _ageLabel(_birthDate),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withAlpha(180),
+            ),
+          )
+        else if (_birthDateError)
+          const Text(
+            'Choisissez la date de naissance',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFFFD2D2),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _photoPlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.add_a_photo_outlined,
+          size: 52,
+          color: Colors.white.withAlpha(220),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Photo du lapin',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withAlpha(190),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---- Étape 2 : sexe, race, couleur, parents ----
+
+  Widget _buildOriginsStep() {
+    final provider = context.watch<RabbitProvider>();
     final eligibleFathers = provider.getEligibleFathers(
       excludeId: widget.initialRabbitToEdit?.id,
     );
     final eligibleMothers = provider.getEligibleMothers(
       excludeId: widget.initialRabbitToEdit?.id,
     );
+    final breeds = provider.breeds;
 
-    final isEditing = widget.initialRabbitToEdit != null;
-
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(isEditing ? 'Modifier le Lapin' : 'Nouveau Reproducteur'),
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Visual Rabbit Avatar selector
-                Center(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: _showPhotoOptions,
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 104,
-                              height: 104,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color:
-                                      _selectedGender == RabbitGender.male
-                                          ? AppColors.maleBlue
-                                          : AppColors.femalePink,
-                                  width: 3,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(15),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ClipOval(
-                                child:
-                                    _pickedPhotoFile != null
-                                        ? Image.file(
-                                          _pickedPhotoFile!,
-                                          width: 104,
-                                          height: 104,
-                                          fit: BoxFit.cover,
-                                        )
-                                        : (widget
-                                                    .initialRabbitToEdit
-                                                    ?.primaryPhotoUrl !=
-                                                null &&
-                                            widget
-                                                .initialRabbitToEdit!
-                                                .primaryPhotoUrl!
-                                                .isNotEmpty)
-                                        ? Image.network(
-                                          ApiConstants.formatMediaUrl(
-                                            widget
-                                                .initialRabbitToEdit!
-                                                .primaryPhotoUrl,
-                                          ),
-                                          width: 104,
-                                          height: 104,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) =>
-                                                  const Center(
-                                                    child: AppIcon(
-                                                      AppIcons.rabbit,
-                                                      size: 56,
-                                                      color: AppColors.primary,
-                                                    ),
-                                                  ),
-                                        )
-                                        : const Center(
-                                          child: AppIcon(
-                                            AppIcons.rabbit,
-                                            size: 56,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 2,
-                              right: 2,
-                              child: Container(
-                                padding: const EdgeInsets.all(7),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(40),
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _showPhotoOptions,
-                        icon: const Icon(
-                          Icons.add_a_photo,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        label: Text(
-                          _pickedPhotoFile != null ||
-                                  (widget
-                                          .initialRabbitToEdit
-                                          ?.primaryPhotoUrl !=
-                                      null)
-                              ? 'Modifier la photo'
-                              : 'Ajouter une photo',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _selectedGender == RabbitGender.male
-                            ? 'Mâle Reproducteur ♂'
-                            : 'Femelle Reproductrice ♀',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color:
-                              _selectedGender == RabbitGender.male
-                                  ? AppColors.maleBlue
-                                  : AppColors.femalePink,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Gender Toggle
-                _buildSectionTitle('Sexe du Lapin'),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildGenderOption(
-                        label: 'Femelle ♀',
-                        gender: RabbitGender.female,
-                        color: AppColors.femalePink,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildGenderOption(
-                        label: 'Mâle ♂',
-                        gender: RabbitGender.male,
-                        color: AppColors.maleBlue,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Breed
-                _buildSectionTitle('Race *'),
-                const SizedBox(height: 8),
-                Builder(
-                  builder: (context) {
-                    final breeds = context.watch<RabbitProvider>().breeds;
-                    return SizedBox(
-                      height: 100,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        clipBehavior: Clip.none,
-                        itemCount: breeds.length + 1,
-                        separatorBuilder: (_, __) => const SizedBox(width: 10),
-                        itemBuilder: (context, index) {
-                          if (index == breeds.length) {
-                            return _buildBreedCard(
-                              name: 'Autre / Croisé',
-                              imageUrl: null,
-                              selected: _selectedBreedId == null,
-                              onTap: () => _selectBreed(null, 'Autre / Croisé'),
-                            );
-                          }
-                          final b = breeds[index];
-                          return _buildBreedCard(
-                            name: b.name,
-                            imageUrl: b.imageUrl,
-                            selected: _selectedBreedId == b.id,
-                            onTap: () => _selectBreed(b.id, b.name),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 16),
-
-                // Color
-                _buildSectionTitle('Robe / Couleur'),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 100,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    clipBehavior: Clip.none,
-                    itemCount: _coatColors.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
-                    itemBuilder: (context, index) {
-                      final c = _coatColors[index];
-                      return _buildColorCard(
-                        name: c.$1,
-                        imageAsset: c.$2,
-                        selected: _selectedColor == c.$1,
-                        onTap: () => setState(() => _selectedColor = c.$1),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Name & Tag number
-                _buildSectionTitle('Identification'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom ou Surnom *',
-                    hintText: 'Ex: Bambou, Bella...',
-                    prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Veuillez saisir un nom';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 16),
-
-                // Cage & loge
-                Builder(
-                  builder: (context) {
-                    final cages = context.watch<RabbitProvider>().cages;
-                    if (cages.isEmpty) {
-                      return TextFormField(
-                        controller: _cageController,
-                        decoration: const InputDecoration(
-                          labelText: 'N° Cage / Clapier',
-                          hintText: 'Ex: A-04',
-                          prefixIcon: Icon(Icons.grid_view, size: 20),
-                        ),
-                      );
-                    }
-                    return _buildCageSelector(cages);
-                  },
-                ),
-
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _weightController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Poids (kg)',
-                          hintText: 'Ex: 4.2',
-                          suffixText: 'kg',
-                          prefixIcon: Icon(Icons.scale, size: 20),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Birth date selector
-                    Expanded(
-                      child: InkWell(
-                        onTap: _pickBirthDate,
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.cake_outlined,
-                                      color: AppColors.primary,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'Date de naissance',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            DateFormat(
-                                              'dd MMMM yyyy',
-                                              'fr_FR',
-                                            ).format(_birthDate),
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(
-                                Icons.edit_calendar,
-                                color: AppColors.textSecondary,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Genealogy / Pedigree Parents selector
-                _buildSectionTitle('Filiation & Arbre Généalogique'),
-                const SizedBox(height: 4),
-                const Text(
-                  'Sélectionnez les géniteurs pour relier automatiquement ce lapin à sa famille et son arbre généalogique.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Father selector
-                DropdownButtonFormField<String?>(
-                  isExpanded: true,
-                  value: _selectedFatherId,
-                  decoration: InputDecoration(
-                    labelText: 'Père ♂',
-                    prefixIcon: const Icon(
-                      Icons.male,
-                      color: AppColors.maleBlue,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Inconnu / Souche externe'),
-                    ),
-                    ...eligibleFathers.map((f) {
-                      return DropdownMenuItem<String?>(
-                        value: f.id,
-                        child: Text(
-                          '${f.name} (${f.tagNumber} - ${f.breed})',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }),
-                  ],
-                  onChanged: (val) {
-                    setState(() => _selectedFatherId = val);
-                  },
-                ),
-
-                const SizedBox(height: 12),
-
-                // Mother selector
-                DropdownButtonFormField<String?>(
-                  isExpanded: true,
-                  value: _selectedMotherId,
-                  decoration: InputDecoration(
-                    labelText: 'Mère ♀',
-                    prefixIcon: const Icon(
-                      Icons.female,
-                      color: AppColors.femalePink,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Inconnue / Souche externe'),
-                    ),
-                    ...eligibleMothers.map((m) {
-                      return DropdownMenuItem<String?>(
-                        value: m.id,
-                        child: Text(
-                          '${m.name} (${m.tagNumber} - ${m.breed})',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }),
-                  ],
-                  onChanged: (val) {
-                    setState(() => _selectedMotherId = val);
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // Status
-                _buildSectionTitle('Statut Actuel'),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<RabbitStatus>(
-                  isExpanded: true,
-                  value: _selectedStatus,
-                  decoration: const InputDecoration(
-                    labelText: 'Statut du reproducteur',
-                    prefixIcon: Icon(Icons.shield_outlined, size: 20),
-                  ),
-                  items:
-                      RabbitStatus.values.map((s) {
-                        String label = 'Actif';
-                        if (s == RabbitStatus.pregnant) label = 'En gestation';
-                        if (s == RabbitStatus.lactating) {
-                          label = 'En allaitement';
-                        }
-                        if (s == RabbitStatus.resting) label = 'Au repos';
-                        if (s == RabbitStatus.retired) label = 'Réformé';
-                        return DropdownMenuItem(value: s, child: Text(label));
-                      }).toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedStatus = val);
-                  },
-                ),
-
-                const SizedBox(height: 16),
-
-                // Notes
-                TextFormField(
-                  controller: _notesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes & Observations',
-                    hintText:
-                        'Docilité, antécédents médicaux, particularités du pelage...',
-                    alignLabelWithHint: true,
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                // Submit button
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _saveRabbit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 2,
-                    ),
-                    child:
-                        _isSaving
-                            ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                            : Text(
-                              isEditing
-                                  ? 'Mettre à jour le lapin'
-                                  : 'Enregistrer le lapin',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Sexe'),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildGenderOption(
+                label: 'Femelle ♀',
+                gender: RabbitGender.female,
+                color: AppColors.femalePink,
+              ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildGenderOption(
+                label: 'Mâle ♂',
+                gender: RabbitGender.male,
+                color: AppColors.maleBlue,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        _buildSectionTitle('Race'),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            itemCount: breeds.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              if (index == breeds.length) {
+                return _buildBreedCard(
+                  name: 'Autre / Croisé',
+                  imageUrl: null,
+                  selected: _selectedBreedId == null,
+                  onTap: () => _selectBreed(null, 'Autre / Croisé'),
+                );
+              }
+              final b = breeds[index];
+              return _buildBreedCard(
+                name: b.name,
+                imageUrl: b.imageUrl,
+                selected: _selectedBreedId == b.id,
+                onTap: () => _selectBreed(b.id, b.name),
+              );
+            },
           ),
         ),
-      ),
+        const SizedBox(height: 20),
+
+        _buildSectionTitle('Robe / Couleur'),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            itemCount: _coatColors.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final c = _coatColors[index];
+              return _buildColorCard(
+                name: c.$1,
+                imageAsset: c.$2,
+                selected: _selectedColor == c.$1,
+                onTap: () => setState(() => _selectedColor = c.$1),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        _buildSectionTitle('Parents'),
+        const SizedBox(height: 4),
+        const Text(
+          'Reliez ce lapin à sa famille et à son arbre généalogique.',
+          style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String?>(
+          isExpanded: true,
+          value: _selectedFatherId,
+          decoration: const InputDecoration(
+            labelText: 'Père ♂',
+            prefixIcon: Icon(Icons.male, color: AppColors.maleBlue),
+          ),
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Inconnu / Souche externe'),
+            ),
+            for (final f in eligibleFathers)
+              DropdownMenuItem<String?>(
+                value: f.id,
+                child: Text(
+                  '${f.name} (${f.tagNumber} - ${f.breed})',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (val) => setState(() => _selectedFatherId = val),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String?>(
+          isExpanded: true,
+          value: _selectedMotherId,
+          decoration: const InputDecoration(
+            labelText: 'Mère ♀',
+            prefixIcon: Icon(Icons.female, color: AppColors.femalePink),
+          ),
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Inconnue / Souche externe'),
+            ),
+            for (final m in eligibleMothers)
+              DropdownMenuItem<String?>(
+                value: m.id,
+                child: Text(
+                  '${m.name} (${m.tagNumber} - ${m.breed})',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (val) => setState(() => _selectedMotherId = val),
+        ),
+        const SizedBox(height: 12),
+
+        // Champs secondaires, repliés pour garder l'étape légère
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            key: const ValueKey('more-info'),
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            initiallyExpanded: widget.initialRabbitToEdit != null,
+            title: _buildSectionTitle('Autres informations'),
+            subtitle: const Text(
+              'Poids, statut et notes',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+            children: [
+              TextFormField(
+                controller: _weightController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Poids (kg)',
+                  hintText: 'Ex : 4.2',
+                  suffixText: 'kg',
+                  prefixIcon: Icon(Icons.scale, size: 20),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<RabbitStatus>(
+                isExpanded: true,
+                value: _selectedStatus,
+                decoration: const InputDecoration(
+                  labelText: 'Statut',
+                  prefixIcon: Icon(Icons.shield_outlined, size: 20),
+                ),
+                items: [
+                  for (final s in RabbitStatus.values)
+                    DropdownMenuItem(
+                      value: s,
+                      child: Text(switch (s) {
+                        RabbitStatus.pregnant => 'En gestation',
+                        RabbitStatus.lactating => 'En allaitement',
+                        RabbitStatus.resting => 'Au repos',
+                        RabbitStatus.retired => 'Réformé',
+                        _ => 'Actif',
+                      }),
+                    ),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _selectedStatus = val);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _notesController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Notes & observations',
+                  hintText:
+                      'Docilité, antécédents, particularités du pelage...',
+                  alignLabelWithHint: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---- Étape 3 : cage et loge ----
+
+  Widget _buildPlacementStep() {
+    final cages = context.watch<RabbitProvider>().cages;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Cage'),
+        const SizedBox(height: 12),
+        if (cages.isEmpty)
+          TextFormField(
+            controller: _cageController,
+            decoration: const InputDecoration(
+              labelText: 'N° Cage / Clapier',
+              hintText: 'Ex : A-04',
+              prefixIcon: Icon(Icons.grid_view, size: 20),
+            ),
+          )
+        else
+          _buildCagePicker(cages),
+      ],
     );
   }
 
@@ -1177,6 +1409,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     );
   }
 
+  /// Choix du sexe : pastille pleine dans la couleur du sexe quand elle est choisie.
   Widget _buildGenderOption({
     required String label,
     required RabbitGender gender,
@@ -1184,29 +1417,24 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   }) {
     final isSelected = _selectedGender == gender;
     return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedGender = gender;
-        });
-      },
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
+      key: ValueKey('gender-${gender.name}'),
+      onTap: () => setState(() => _selectedGender = gender),
+      borderRadius: BorderRadius.circular(30),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.cardBorder,
-            width: isSelected ? 2 : 1,
-          ),
+          color: isSelected ? color : color.withAlpha(20),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: isSelected ? color : color.withAlpha(90)),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: isSelected ? Colors.white : color,
           ),
         ),
       ),

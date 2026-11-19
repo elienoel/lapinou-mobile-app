@@ -64,7 +64,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final list = chat.conversations;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         title: const Text(
           'Messages',

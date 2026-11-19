@@ -71,7 +71,7 @@ class CategorySettingsScreen extends StatelessWidget {
     final categories = context.watch<CategoryProvider>();
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
         title: const Text(
           'Catégories',
