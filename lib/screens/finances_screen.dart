@@ -1091,6 +1091,8 @@ class _FinancesScreenState extends State<FinancesScreen> {
     FinanceTransaction fin,
     AppCurrency currency,
   ) {
+    final dateUpper = DateFormat('dd MMM yyyy', 'fr_FR').format(fin.date).toUpperCase();
+
     return InkWell(
       key: ValueKey('tx-${fin.id}'),
       borderRadius: BorderRadius.circular(AppRadius.card),
@@ -1102,16 +1104,20 @@ class _FinancesScreenState extends State<FinancesScreen> {
             existing: fin,
           ),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: appCardDecoration(),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
+        ),
         child: Row(
           children: [
             BanknoteStackIcon(
               amount: fin.amount,
               isIncome: fin.isIncome,
+              borderWidth: 3.5,
+              borderColor: Colors.white,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1119,28 +1125,42 @@ class _FinancesScreenState extends State<FinancesScreen> {
                   Text(
                     fin.title,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    '${fin.category} • ${DateFormat('dd MMM yyyy', 'fr_FR').format(fin.date)}',
+                    fin.category,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    dateUpper,
                     style: const TextStyle(
                       fontSize: 11,
-                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               currency.format(
                 fin.isIncome ? fin.amount : -fin.amount,
                 showSign: true,
               ),
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
                 color:
                     fin.isIncome
                         ? AppColors.statusActiveText

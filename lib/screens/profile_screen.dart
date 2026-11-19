@@ -246,9 +246,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ---- Haut violet : identité et statistiques ----
+              // ---- Haut noir en dégradé : identité et statistiques ----
               Container(
-                color: AppColors.secondary,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF000000),
+                      Color(0xFF141416),
+                      Color(0xFF1E1E24),
+                    ],
+                  ),
+                ),
                 padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -264,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-              const WaveEdge(color: AppColors.secondary),
+              const WaveEdge(color: Color(0xFF1E1E24)),
 
               // ---- Bas blanc : le compte ----
               Padding(

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../services/sync_service.dart';
 import '../theme/colors.dart';
+import 'breeding_settings_screen.dart';
 import 'category_settings_screen.dart';
 import 'currency_settings_screen.dart';
 import 'sync_settings_screen.dart';
@@ -44,6 +45,25 @@ class SettingsScreen extends StatelessWidget {
               decoration: appCardDecoration(),
               child: Column(
                 children: [
+                  _tile(
+                    context,
+                    key: const ValueKey('settings-breeding'),
+                    icon: Icons.tune_rounded,
+                    title: 'Cycles & Rappels d\'élevage',
+                    subtitle: 'Gestation, sevrage, palpation et notifications',
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const BreedingSettingsScreen(),
+                          ),
+                        ),
+                  ),
+                  const Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Color(0xFFEDEFED),
+                  ),
                   _tile(
                     context,
                     key: const ValueKey('settings-currency'),

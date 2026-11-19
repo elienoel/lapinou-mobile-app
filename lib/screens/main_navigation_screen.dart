@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/breeding_settings_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../services/breeding_notifications.dart';
 import '../services/reminder_notifications.dart';
@@ -31,17 +32,21 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   RabbitProvider? _rabbits;
+  BreedingSettingsProvider? _breedingSettings;
 
   @override
   void initState() {
     super.initState();
     // Rappels d'élevage : autorisation demandée une fois connecté, puis
-    // reprogrammés à chaque changement des données d'élevage.
+    // reprogrammés à chaque changement des données d'élevage ou des paramètres.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ReminderNotifications.instance.requestPermission();
       _rabbits =
           context.read<RabbitProvider>()..addListener(_scheduleReminders);
+      _breedingSettings =
+          context.read<BreedingSettingsProvider>()
+            ..addListener(_scheduleReminders);
       _scheduleReminders();
     });
   }
@@ -49,13 +54,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void dispose() {
     _rabbits?.removeListener(_scheduleReminders);
+    _breedingSettings?.removeListener(_scheduleReminders);
     super.dispose();
   }
 
   void _scheduleReminders() {
     final provider = _rabbits;
     if (provider == null) return;
-    ReminderNotifications.instance.schedule(breedingNotifications(provider));
+    final settings =
+        _breedingSettings?.settings ?? BreedingSettings.defaults;
+    ReminderNotifications.instance.schedule(
+      breedingNotifications(provider, settings),
+    );
   }
 
   void _onTabSelected(int index) {

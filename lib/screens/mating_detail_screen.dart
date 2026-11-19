@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/litter.dart';
 import '../models/mating.dart';
 import '../models/rabbit.dart';
+import '../providers/breeding_settings_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../utils/formatters.dart';
@@ -127,6 +128,7 @@ class MatingDetailScreen extends StatelessWidget {
     Mating m,
     Litter? litter,
   ) {
+    final settings = context.watch<BreedingSettingsProvider>().settings;
     final failed = m.status == MatingStatus.failed;
     final completed = m.status == MatingStatus.completed;
 
@@ -144,7 +146,8 @@ class MatingDetailScreen extends StatelessWidget {
       palpationText = 'Négative ou non faite';
     } else if (m.isActive) {
       palpationState = _StepState.current;
-      palpationText = 'Prévue vers le ${formatDate(m.palpationDate)} (J12)';
+      palpationText =
+          'Prévue vers le ${formatDate(m.palpationDateWith(settings.palpationDays))} (J${settings.palpationDays})';
     } else {
       palpationState = _StepState.skipped;
       palpationText = 'Non renseignée';
@@ -158,7 +161,8 @@ class MatingDetailScreen extends StatelessWidget {
       nestText = 'Posée le ${formatDate(m.nestBoxDoneAt!)}';
     } else if (m.isActive) {
       nestState = m.palpationDone ? _StepState.current : _StepState.upcoming;
-      nestText = 'À poser vers le ${formatDate(m.nestBoxDate)} (J28)';
+      nestText =
+          'À poser vers le ${formatDate(m.nestBoxDateWith(settings.nestBoxDaysBeforeKindling))} (J${settings.nestBoxDayOfCycle})';
     } else {
       nestState = failed ? _StepState.upcoming : _StepState.skipped;
       nestText = failed ? '—' : 'Non renseignée';
@@ -230,7 +234,7 @@ class MatingDetailScreen extends StatelessWidget {
           subtitle:
               failed
                   ? '—'
-                  : 'Prévue le ${formatDate(m.expectedKindlingDate)} (J31)',
+                  : 'Prévue le ${formatDate(m.expectedKindlingDateWith(settings.gestationDays))} (J${settings.gestationDays})',
           actions: [
             if (m.isActive)
               _action(

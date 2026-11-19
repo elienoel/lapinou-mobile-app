@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/breeding_settings_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../widgets/reminders.dart';
@@ -13,9 +14,10 @@ class ActivityScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final breedingSettings = context.watch<BreedingSettingsProvider>().settings;
     return Consumer<RabbitProvider>(
       builder: (context, provider, child) {
-        final items = buildReminders(provider);
+        final items = buildReminders(provider, breedingSettings);
 
         return Scaffold(
           appBar: AppBar(

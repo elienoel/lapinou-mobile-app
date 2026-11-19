@@ -171,6 +171,8 @@ class BanknoteStackIcon extends StatelessWidget {
   final double fixedSlotWidth;
   final double noteWidth;
   final double noteHeight;
+  final double borderWidth;
+  final Color borderColor;
 
   const BanknoteStackIcon({
     super.key,
@@ -179,6 +181,8 @@ class BanknoteStackIcon extends StatelessWidget {
     this.fixedSlotWidth = 62.0,
     this.noteWidth = 32.0,
     this.noteHeight = 48.0,
+    this.borderWidth = 3.5,
+    this.borderColor = Colors.white,
   });
 
   @override
@@ -218,30 +222,94 @@ class BanknoteStackIcon extends StatelessWidget {
     final double usedWidth = noteWidth + (totalNotes - 1) * step;
     final double startLeft = (fixedSlotWidth - usedWidth) / 2.0;
 
-    return SizedBox(
-      width: fixedSlotWidth,
-      height: noteHeight + 4,
-      child: Stack(
+    // Définition des décalages relatifs (x, y) et rotations de chaque billet
+    final offsets = <Offset>[];
+    final rotations = <double>[];
+    for (var i = 0; i < totalNotes; i++) {
+      final x = startLeft + (i * step);
+      final y = (i % 2 == 1) ? 2.0 : 0.0;
+      final rot = i == 0 ? 0.0 : ((i % 2 == 1 ? 0.04 : -0.04) * (i > 2 ? 0.5 : 1.0));
+      offsets.add(Offset(x, y));
+      rotations.add(rot);
+    }
+
+    Widget buildBanknoteGroup({bool isBorderSilhouette = false}) {
+      return Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.centerLeft,
         children: [
           for (var i = 0; i < totalNotes; i++)
             Positioned(
-              left: startLeft + (i * step),
-              top: (i % 2 == 1) ? 2 : 0,
-              child: BanknoteItem(
-                banknote: notes[i],
-                width: noteWidth,
-                height: noteHeight,
-                isVertical: true,
-                borderRadius: 3,
-                rotation: i == 0
-                    ? 0.0
-                    : ((i % 2 == 1 ? 0.04 : -0.04) * (i > 2 ? 0.5 : 1.0)),
-              ),
+              left: offsets[i].dx,
+              top: offsets[i].dy,
+              child: isBorderSilhouette
+                  ? Transform.rotate(
+                      angle: rotations[i],
+                      child: Container(
+                        width: noteWidth,
+                        height: noteHeight,
+                        decoration: BoxDecoration(
+                          color: borderColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    )
+                  : BanknoteItem(
+                      banknote: notes[i],
+                      width: noteWidth,
+                      height: noteHeight,
+                      isVertical: true,
+                      borderRadius: 4,
+                      rotation: rotations[i],
+                    ),
             ),
         ],
-      ),
+      );
+    }
+
+    // Si borderWidth > 0, on génère une silhouette blanche continue tout autour
+    // du groupe superposé en échantillonnant les angles avec un petit rayon.
+    // Cela crée un bord extérieur blanc uniforme qui épouse exactement le contour
+    // global du bloc de billets sans tracer de bordure sur les billets individuels.
+    if (borderWidth > 0) {
+      final r = borderWidth;
+      // 8 directions cardinales + intercardinales pour un contour propre et régulier
+      final d = r * 0.7071;
+      final borderOffsets = [
+        Offset(-r, 0),
+        Offset(r, 0),
+        Offset(0, -r),
+        Offset(0, r),
+        Offset(-d, -d),
+        Offset(d, -d),
+        Offset(-d, d),
+        Offset(d, d),
+      ];
+
+      return SizedBox(
+        width: fixedSlotWidth,
+        height: noteHeight + 4,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.centerLeft,
+          children: [
+            // Couche contour blanc extérieur
+            for (final bo in borderOffsets)
+              Transform.translate(
+                offset: bo,
+                child: buildBanknoteGroup(isBorderSilhouette: true),
+              ),
+            // Billets intérieurs intacts
+            buildBanknoteGroup(isBorderSilhouette: false),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: fixedSlotWidth,
+      height: noteHeight + 4,
+      child: buildBanknoteGroup(isBorderSilhouette: false),
     );
   }
 }

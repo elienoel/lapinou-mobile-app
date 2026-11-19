@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/care.dart';
 import '../models/currency.dart';
 import '../providers/auth_provider.dart';
+import '../providers/breeding_settings_provider.dart';
 import '../providers/marketplace_provider.dart';
 import '../providers/pharmacy_provider.dart';
 import '../providers/promotions_provider.dart';
@@ -88,10 +89,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ---- Haut violet : en-tête et résumé de l'activité ----
+                    // ---- Haut noir en dégradé : en-tête et résumé de l'activité ----
                     Container(
                       width: double.infinity,
-                      color: AppColors.secondary,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xFF000000),
+                            Color(0xFF141416),
+                            Color(0xFF1E1E24),
+                          ],
+                        ),
+                      ),
                       padding: EdgeInsets.fromLTRB(16, topInset + 14, 16, 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,15 +259,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 
-  /// Carrousels d'annonces posés à cheval sur la transition : le violet plein
+  /// Carrousels d'annonces posés à cheval sur la transition : le noir
   /// s'arrête au milieu de la première carte ; la 1re lame du dégradé finit au
   /// bas de la carte, les deux autres juste après. Sans annonce, seule la
   /// vague reste.
   Widget _buildCarouselBridge(BuildContext context) {
+    const topWaveColor = Color(0xFF1E1E24);
     final hasAds = context.select<PromotionsProvider, bool>(
       (p) => p.carousels.isNotEmpty,
     );
-    if (!hasAds) return const WaveEdge(color: AppColors.secondary);
+    if (!hasAds) return const WaveEdge(color: topWaveColor);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -277,8 +289,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               right: 0,
               child: Column(
                 children: [
-                  Container(height: solidHeight, color: AppColors.secondary),
-                  WaveEdge(color: AppColors.secondary, firstBlade: firstBlade),
+                  Container(height: solidHeight, color: topWaveColor),
+                  WaveEdge(color: topWaveColor, firstBlade: firstBlade),
                 ],
               ),
             ),
@@ -302,7 +314,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// mises bas, soins). Vide si rien n'est dû bientôt ; "Voir plus" ouvre la
   /// page Activité avec toutes les actions, sans limite de délai.
   Widget _buildReminderSection(BuildContext context, RabbitProvider provider) {
-    final all = buildReminders(provider);
+    final breedingSettings =
+        context.watch<BreedingSettingsProvider>().settings;
+    final all = buildReminders(provider, breedingSettings);
     final nearTerm =
         all.where((i) => i.daysUntilDue <= _reminderHorizonDays).toList();
     if (nearTerm.isEmpty) return const SizedBox.shrink();

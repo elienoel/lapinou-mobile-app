@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/care.dart';
+import '../providers/breeding_settings_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../screens/care_screen.dart';
 import '../screens/matings_screen.dart';
@@ -86,12 +87,21 @@ int _daysUntil(DateTime date) {
 /// enregistrables, soins dus), triée par urgence (la plus pressante d'abord).
 /// Pas de limite de date ici : c'est à l'appelant de ne garder que les
 /// prochains jours s'il le souhaite (voir le rappel de la page d'accueil).
-List<ReminderItem> buildReminders(RabbitProvider provider) {
+List<ReminderItem> buildReminders(
+  RabbitProvider provider, [
+  BreedingSettings settings = BreedingSettings.defaults,
+]) {
   final items = <ReminderItem>[];
 
   for (final m in provider.matingsAwaitingKindling) {
     final female = provider.getRabbitById(m.femaleId)?.name ?? 'Femelle';
     final male = provider.getRabbitById(m.maleId)?.name ?? 'Mâle';
+
+    final palpationDay = m.palpationDateWith(settings.palpationDays);
+    final kindlingDay = m.expectedKindlingDateWith(settings.gestationDays);
+    final nestBoxDay = kindlingDay.subtract(
+      Duration(days: settings.nestBoxDaysBeforeKindling),
+    );
 
     if (!m.palpationDone) {
       items.add(
@@ -102,15 +112,15 @@ List<ReminderItem> buildReminders(RabbitProvider provider) {
           title: 'Palpation à faire',
           subtitle: '$female × $male',
           actionLabel: 'Palpation effectuée',
-          daysUntilDue: _daysUntil(m.palpationDate),
+          daysUntilDue: _daysUntil(palpationDay),
           onAction: (context, p) => confirmMatingPalpation(context, p, m),
           detail:
               'La palpation permet de confirmer si $female est gestante. '
-              'Prévue le ${_dateFmt.format(m.palpationDate)} (12 jours après '
+              'Prévue le ${_dateFmt.format(palpationDay)} (${settings.palpationDays} jours après '
               'la saillie du ${_dateFmt.format(m.matingDate)} avec $male).'
-              '${m.shouldInstallNestBox ? '\n\nLa boîte à nid devrait déjà être installée (prévue le ${_dateFmt.format(m.nestBoxDate)}).' : ''}'
+              '${DateTime.now().isAfter(nestBoxDay) ? '\n\nLa boîte à nid devrait déjà être installée (prévue le ${_dateFmt.format(nestBoxDay)}).' : ''}'
               '\n\nSi la gestation est confirmée, la mise bas est attendue '
-              'vers le ${_dateFmt.format(m.expectedKindlingDate)}.',
+              'vers le ${_dateFmt.format(kindlingDay)}.',
           viewLabel: 'Voir les accouplements',
           onViewDetail:
               (context, p) => Navigator.push(
@@ -127,13 +137,13 @@ List<ReminderItem> buildReminders(RabbitProvider provider) {
           bg: AppColors.statusPregnantBg,
           fg: AppColors.statusPregnantText,
           title: 'Boîte à nid à poser',
-          subtitle: _nestBoxHint(female, m.expectedKindlingDate),
+          subtitle: _nestBoxHint(female, kindlingDay),
           actionLabel: 'Boîte à nid posée',
-          daysUntilDue: _daysUntil(m.nestBoxDate),
+          daysUntilDue: _daysUntil(nestBoxDay),
           onAction: (context, p) => confirmMatingNestBox(context, p, m),
           detail:
-              'La mise bas de $female × $male aura lieu dans environ 3 jours '
-              '(attendue vers le ${_dateFmt.format(m.expectedKindlingDate)}).'
+              'La mise bas de $female × $male aura lieu dans environ ${settings.nestBoxDaysBeforeKindling} jours '
+              '(attendue vers le ${_dateFmt.format(kindlingDay)}).'
               '\n\nInstallez la boîte à nid garnie de paille ou de copeaux '
               'propres pour permettre à la femelle de préparer son nid avant la mise bas.',
           viewLabel: 'Voir les accouplements',
@@ -154,13 +164,13 @@ List<ReminderItem> buildReminders(RabbitProvider provider) {
           title: 'Mise bas à enregistrer',
           subtitle: '$female × $male',
           actionLabel: 'Mise bas enregistrée',
-          daysUntilDue: _daysUntil(m.expectedKindlingDate),
+          daysUntilDue: _daysUntil(kindlingDay),
           onAction: (context, p) => showLitterForm(context, p, mating: m),
           detail:
               'La mise bas de $female × $male est attendue vers le '
-              '${_dateFmt.format(m.expectedKindlingDate)} (J${m.gestationDay} '
+              '${_dateFmt.format(kindlingDay)} (J${m.gestationDay} '
               'de gestation, saillie du ${_dateFmt.format(m.matingDate)}).'
-              '${m.shouldInstallNestBox ? '\n\nLa boîte à nid devrait être installée depuis le ${_dateFmt.format(m.nestBoxDate)}.' : ''}'
+              '${DateTime.now().isAfter(nestBoxDay) ? '\n\nLa boîte à nid devrait être installée depuis le ${_dateFmt.format(nestBoxDay)}.' : ''}'
               '\n\nDès que la mise bas a eu lieu, enregistrez-la pour créer '
               'la portée.',
           viewLabel: 'Voir les accouplements',

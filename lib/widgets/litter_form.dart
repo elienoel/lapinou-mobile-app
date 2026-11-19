@@ -2,8 +2,10 @@ import '../utils/formatters.dart';
 import 'app_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/litter.dart';
 import '../models/mating.dart';
+import '../providers/breeding_settings_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 
@@ -103,6 +105,8 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
     final notes = _notes.text.trim();
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    final weaningDays =
+        context.read<BreedingSettingsProvider>().settings.weaningDays;
     final error = await provider.addLitter(
       Litter(
         id: 'lit-${DateTime.now().millisecondsSinceEpoch}',
@@ -121,9 +125,7 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
       );
       return;
     }
-    final weaning = _birthDate.add(
-      const Duration(days: Litter.defaultWeaningDays),
-    );
+    final weaning = _birthDate.add(Duration(days: weaningDays));
     navigator.pop();
     messenger.showSnackBar(
       SnackBar(
@@ -243,13 +245,19 @@ class _LitterFormSheetState extends State<LitterFormSheet> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            'Sevrage prévu le ${formatDate(_birthDate.add(const Duration(days: Litter.defaultWeaningDays)))}',
-            key: const ValueKey('litter-form-weaning-hint'),
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
+          Builder(
+            builder: (ctx) {
+              final weaningDays =
+                  ctx.watch<BreedingSettingsProvider>().settings.weaningDays;
+              return Text(
+                'Sevrage prévu le ${formatDate(_birthDate.add(Duration(days: weaningDays)))} (à $weaningDays jours)',
+                key: const ValueKey('litter-form-weaning-hint'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           Row(

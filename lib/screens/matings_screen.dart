@@ -7,6 +7,7 @@ import '../models/litter.dart';
 import '../models/mating.dart';
 import '../models/rabbit.dart';
 import '../providers/auth_provider.dart';
+import '../providers/breeding_settings_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../widgets/pair_avatars.dart';
@@ -182,7 +183,12 @@ class _MatingsScreenState extends State<MatingsScreen> {
     final litter = e.litter;
     final female = provider.getRabbitById(m?.femaleId ?? litter!.motherId);
     final male = provider.getRabbitById(m?.maleId ?? litter!.fatherId);
-    final (value, caption, color) = matingStage(m, litter);
+    final breedingSettings = context.watch<BreedingSettingsProvider>().settings;
+    final (value, caption, color) = matingStage(
+      m,
+      litter,
+      breedingSettings.gestationDays,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -266,7 +272,7 @@ class _MatingsScreenState extends State<MatingsScreen> {
 
 /// Résumé de l'avancement pour la carte : (valeur, légende, couleur).
 /// Pendant la gestation : le compte à rebours avant la mise bas (J-12).
-(String, String, Color) matingStage(Mating? m, Litter? litter) {
+(String, String, Color) matingStage(Mating? m, Litter? litter, [int? gestationDays]) {
   if (m?.status == MatingStatus.failed) {
     return ('Échec', 'non réussi', AppColors.statusAlertText);
   }
@@ -276,7 +282,7 @@ class _MatingsScreenState extends State<MatingsScreen> {
   if (m != null && m.isActive) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final due = m.expectedKindlingDate;
+    final due = m.expectedKindlingDateWith(gestationDays);
     final d = DateTime(due.year, due.month, due.day).difference(today).inDays;
     if (d > 0) return ('J-$d', 'mise bas', AppColors.secondary);
     if (d == 0) return ('Jour J', 'mise bas', AppColors.statusPregnantText);
@@ -391,9 +397,10 @@ void showMatingForm(
           final daysAgo = today.difference(currentSelectedDay).inDays;
           final isToday = daysAgo == 0;
 
-          final palpationDate = matingDate.add(const Duration(days: 12));
-          final nestBoxDate = matingDate.add(const Duration(days: 28));
-          final expectedKindlingDate = matingDate.add(const Duration(days: 31));
+          final settings = ctx.read<BreedingSettingsProvider>().settings;
+          final palpationDate = matingDate.add(Duration(days: settings.palpationDays));
+          final nestBoxDate = matingDate.add(Duration(days: settings.nestBoxDayOfCycle));
+          final expectedKindlingDate = matingDate.add(Duration(days: settings.gestationDays));
 
           final formattedDate = DateFormat(
             'EEEE d MMMM yyyy',
@@ -626,30 +633,30 @@ void showMatingForm(
                           children: [
                             _milestoneItem(
                               title: 'Palpation',
-                              dayBadge: 'J+12',
+                              dayBadge: 'J+${settings.palpationDays}',
                               date: DateFormat(
                                 'dd/MM',
                                 'fr_FR',
                               ).format(palpationDate),
-                              isPassed: daysAgo >= 12,
+                              isPassed: daysAgo >= settings.palpationDays,
                             ),
                             _milestoneItem(
                               title: 'Boîte à nid',
-                              dayBadge: 'J+28',
+                              dayBadge: 'J+${settings.nestBoxDayOfCycle}',
                               date: DateFormat(
                                 'dd/MM',
                                 'fr_FR',
                               ).format(nestBoxDate),
-                              isPassed: daysAgo >= 28,
+                              isPassed: daysAgo >= settings.nestBoxDayOfCycle,
                             ),
                             _milestoneItem(
                               title: 'Mise bas',
-                              dayBadge: 'J+31',
+                              dayBadge: 'J+${settings.gestationDays}',
                               date: DateFormat(
                                 'dd/MM',
                                 'fr_FR',
                               ).format(expectedKindlingDate),
-                              isPassed: daysAgo >= 31,
+                              isPassed: daysAgo >= settings.gestationDays,
                               isHighlight: true,
                             ),
                           ],

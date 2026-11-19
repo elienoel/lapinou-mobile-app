@@ -83,20 +83,31 @@ class Mating {
   bool get canRegisterKindling =>
       isActive && daysSinceMating >= minGestationDays;
 
-  /// Date estimée de palpation (12 jours après le saut)
-  DateTime get palpationDate => matingDate.add(const Duration(days: 12));
+  /// Date estimée de palpation (par défaut 12 jours après le saut, configurable via [days])
+  DateTime palpationDateWith([int? days]) =>
+      matingDate.add(Duration(days: days ?? 12));
 
-  /// Date de pose de la boîte à nid (28 jours après le saut)
-  DateTime get nestBoxDate => matingDate.add(const Duration(days: 28));
+  DateTime get palpationDate => palpationDateWith();
 
-  /// Date estimée de mise bas (31 jours en moyenne)
-  DateTime get expectedKindlingDate => matingDate.add(const Duration(days: 31));
+  /// Date de pose de la boîte à nid (par défaut 28 jours après le saut, configurable via [days])
+  DateTime nestBoxDateWith([int? days]) =>
+      matingDate.add(Duration(days: days ?? 28));
+
+  DateTime get nestBoxDate => nestBoxDateWith();
+
+  /// Date estimée de mise bas (par défaut 31 jours en moyenne, configurable via [days])
+  DateTime expectedKindlingDateWith([int? days]) =>
+      matingDate.add(Duration(days: days ?? 31));
+
+  DateTime get expectedKindlingDate => expectedKindlingDateWith();
 
   /// Nombre de jours restants avant la mise bas
-  int get daysUntilKindling {
+  int daysUntilKindlingWith([int? days]) {
     final now = DateTime.now();
-    return expectedKindlingDate.difference(now).inDays;
+    return expectedKindlingDateWith(days).difference(now).inDays;
   }
+
+  int get daysUntilKindling => daysUntilKindlingWith();
 
   /// Est-ce que la boîte à nid doit déjà être installée ?
   bool get shouldInstallNestBox {

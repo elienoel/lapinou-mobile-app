@@ -59,8 +59,11 @@ class Litter {
   int get ageDays =>
       _dateOnly(DateTime.now()).difference(_dateOnly(birthDate)).inDays;
 
-  DateTime get calculatedWeaningDate =>
-      weaningDate ?? birthDate.add(const Duration(days: defaultWeaningDays));
+  DateTime calculatedWeaningDateWith([int? defaultDays]) =>
+      weaningDate ??
+      birthDate.add(Duration(days: defaultDays ?? defaultWeaningDays));
+
+  DateTime get calculatedWeaningDate => calculatedWeaningDateWith();
 
   /// Jours avant la date prévue de sevrage ; négatif quand elle est dépassée.
   int get daysUntilWeaning =>

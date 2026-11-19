@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/breeding_settings_provider.dart';
 import 'providers/rabbit_provider.dart';
 import 'providers/community_provider.dart';
 import 'providers/category_provider.dart';
@@ -61,6 +62,7 @@ class ClapInApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProvider(create: (_) => PharmacyProvider()),
         ChangeNotifierProvider(create: (_) => PromotionsProvider()),
+        ChangeNotifierProvider(create: (_) => BreedingSettingsProvider()),
         ChangeNotifierProxyProvider<AuthProvider, MarketplaceProvider>(
           create: (_) => MarketplaceProvider(),
           update:
