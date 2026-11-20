@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 /// Billets disponibles dans les assets de l'application (francs CFA BCEAO).
 enum CfaBanknote {
-  f10000(10000, 'assets/money/10000f.jpeg', '10 000 F'),
-  f5000(5000, 'assets/money/5000f.jpeg', '5 000 F'),
-  f2000(2000, 'assets/money/2000f.jpeg', '2 000 F'),
-  f1000(1000, 'assets/money/1000f.jpeg', '1 000 F'),
-  f500(500, 'assets/money/500f.jpeg', '500 F');
+  f10000(10000, 'assets/money/10000f.png', '10 000 F'),
+  f5000(5000, 'assets/money/5000f.png', '5 000 F'),
+  f2000(2000, 'assets/money/2000f.png', '2 000 F'),
+  f1000(1000, 'assets/money/1000f.png', '1 000 F'),
+  f500(500, 'assets/money/500f.png', '500 F');
 
   final int value;
   final String assetPath;
@@ -77,56 +77,37 @@ class BanknoteItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Si isVertical est vrai, le billet est affiché en mode portrait (debout).
-    // On pivote l'image horizontale de 90° dans le conteneur vertical.
-    Widget content = isVertical
-        ? SizedBox(
-            width: width,
-            height: height,
-            child: Center(
-              child: RotatedBox(
-                quarterTurns: 3, // Tourne de 90° pour afficher le billet debout
-                child: SizedBox(
-                  width: height,
-                  height: width,
-                  child: Image.asset(
-                    banknote.assetPath,
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.medium,
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Text(
-                        banknote.label,
-                        style: TextStyle(
-                          fontSize: width * 0.28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+    // Les images des billets sont verticales (debout). En mode horizontal,
+    // on les pivote de 90° dans le conteneur couché.
+    final image = Image.asset(
+      banknote.assetPath,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      errorBuilder:
+          (_, __, ___) => Center(
+            child: Text(
+              banknote.label,
+              style: TextStyle(
+                fontSize: (isVertical ? width : height) * 0.28,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
               ),
             ),
-          )
-        : SizedBox(
-            width: width,
-            height: height,
-            child: Image.asset(
-              banknote.assetPath,
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (_, __, ___) => Center(
-                child: Text(
-                  banknote.label,
-                  style: TextStyle(
-                    fontSize: height * 0.28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+          ),
+    );
+    Widget content =
+        isVertical
+            ? SizedBox(width: width, height: height, child: image)
+            : SizedBox(
+              width: width,
+              height: height,
+              child: Center(
+                child: RotatedBox(
+                  quarterTurns: 1,
+                  child: SizedBox(width: height, height: width, child: image),
                 ),
               ),
-            ),
-          );
+            );
 
     Widget card = Container(
       width: width,
@@ -153,10 +134,7 @@ class BanknoteItem extends StatelessWidget {
     );
 
     if (rotation != 0.0) {
-      card = Transform.rotate(
-        angle: rotation,
-        child: card,
-      );
+      card = Transform.rotate(angle: rotation, child: card);
     }
 
     return card;
@@ -214,9 +192,8 @@ class BanknoteStackIcon extends StatelessWidget {
 
     final totalNotes = notes.length;
     // Calcule le pas de décalage pour tenir dans fixedSlotWidth
-    final double maxOffset = totalNotes > 1
-        ? (fixedSlotWidth - noteWidth) / (totalNotes - 1)
-        : 0.0;
+    final double maxOffset =
+        totalNotes > 1 ? (fixedSlotWidth - noteWidth) / (totalNotes - 1) : 0.0;
     // On borne le décalage pour garder une superposition élégante
     final double step = maxOffset > 8.0 ? 8.0 : maxOffset;
     final double usedWidth = noteWidth + (totalNotes - 1) * step;
@@ -228,7 +205,8 @@ class BanknoteStackIcon extends StatelessWidget {
     for (var i = 0; i < totalNotes; i++) {
       final x = startLeft + (i * step);
       final y = (i % 2 == 1) ? 2.0 : 0.0;
-      final rot = i == 0 ? 0.0 : ((i % 2 == 1 ? 0.04 : -0.04) * (i > 2 ? 0.5 : 1.0));
+      final rot =
+          i == 0 ? 0.0 : ((i % 2 == 1 ? 0.04 : -0.04) * (i > 2 ? 0.5 : 1.0));
       offsets.add(Offset(x, y));
       rotations.add(rot);
     }
@@ -242,26 +220,27 @@ class BanknoteStackIcon extends StatelessWidget {
             Positioned(
               left: offsets[i].dx,
               top: offsets[i].dy,
-              child: isBorderSilhouette
-                  ? Transform.rotate(
-                      angle: rotations[i],
-                      child: Container(
+              child:
+                  isBorderSilhouette
+                      ? Transform.rotate(
+                        angle: rotations[i],
+                        child: Container(
+                          width: noteWidth,
+                          height: noteHeight,
+                          decoration: BoxDecoration(
+                            color: borderColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      )
+                      : BanknoteItem(
+                        banknote: notes[i],
                         width: noteWidth,
                         height: noteHeight,
-                        decoration: BoxDecoration(
-                          color: borderColor,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+                        isVertical: true,
+                        borderRadius: 4,
+                        rotation: rotations[i],
                       ),
-                    )
-                  : BanknoteItem(
-                      banknote: notes[i],
-                      width: noteWidth,
-                      height: noteHeight,
-                      isVertical: true,
-                      borderRadius: 4,
-                      rotation: rotations[i],
-                    ),
             ),
         ],
       );
