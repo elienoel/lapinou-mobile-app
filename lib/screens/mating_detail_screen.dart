@@ -311,9 +311,12 @@ class MatingDetailScreen extends StatelessWidget {
     final d = litter.daysUntilWeaning;
     final weaningLine = switch (litter.status) {
       LitterStatus.weaned =>
-        litter.weanedAt != null
+        (litter.weanedAt != null
             ? 'Sevrage terminé le ${formatDate(litter.weanedAt!)}'
-            : 'Sevrage terminé',
+            : 'Sevrage terminé') +
+            (litter.kitsUnregistered > 0
+                ? ' · ${litter.kitsUnregistered} à nommer'
+                : ''),
       LitterStatus.weaningDue =>
         d == 0 ? 'Sevrage à faire aujourd’hui' : 'Sevrage en retard de ${-d} j',
       LitterStatus.nursing =>
@@ -370,12 +373,33 @@ class MatingDetailScreen extends StatelessWidget {
                 _stat('Au nid', '${litter.kitsRemaining}', AppColors.secondary),
                 _stat('Sevrés', '${litter.weaned}', AppColors.maleBlue),
                 _stat(
+                  'À nommer',
+                  '${litter.kitsUnregistered}',
+                  litter.kitsUnregistered > 0
+                      ? AppColors.statusAlertText
+                      : AppColors.textMuted,
+                  key: ValueKey('litter-to-name-${litter.id}'),
+                ),
+                _stat(
                   'Pertes',
                   '$losses',
                   losses > 0 ? Colors.redAccent : AppColors.textMuted,
                 ),
               ],
             ),
+            if (litter.kitsPresent > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _presentLine(litter),
+                  key: ValueKey('litter-present-${litter.id}'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
             if (!litter.isWeaned) ...[
               const SizedBox(height: 10),
               ClipRRect(
@@ -423,6 +447,23 @@ class MatingDetailScreen extends StatelessWidget {
               icon: Icons.call_split_rounded,
               onPressed: () => _wean(context, litter),
             ),
+          // Toujours possible, même accouplement clôturé
+          if (litter.kitsUnregistered > 0) ...[
+            _action(
+              key: ValueKey('register-kits-${litter.id}'),
+              label: 'Nommer les lapereaux',
+              icon: Icons.badge_outlined,
+              outlined: !litter.isWeaned,
+              onPressed: () => _registerKits(context, litter),
+            ),
+            _action(
+              key: ValueKey('release-kits-${litter.id}'),
+              label: 'Vendus / morts',
+              icon: Icons.output_rounded,
+              outlined: true,
+              onPressed: () => _releaseKits(context, litter),
+            ),
+          ],
         ],
       ),
     ];
@@ -440,6 +481,37 @@ class MatingDetailScreen extends StatelessWidget {
           ? 'Sevrage enregistré · $created fiche${created > 1 ? 's' : ''} lapin créée${created > 1 ? 's' : ''}'
           : 'Sevrage enregistré',
     );
+  }
+
+  /// « 5 lapereaux présents dans le cheptel : 2 au nid, 3 sevrés à nommer »
+  static String _presentLine(Litter litter) {
+    final n = litter.kitsPresent;
+    final parts = [
+      if (litter.kitsRemaining > 0) '${litter.kitsRemaining} au nid',
+      if (litter.kitsUnregistered > 0)
+        '${litter.kitsUnregistered} sevré${litter.kitsUnregistered > 1 ? 's' : ''} à nommer',
+    ];
+    return '$n lapereau${n > 1 ? 'x' : ''} présent${n > 1 ? 's' : ''} dans le cheptel : '
+        '${parts.join(', ')}';
+  }
+
+  Future<void> _registerKits(BuildContext context, Litter litter) async {
+    final provider = context.read<RabbitProvider>();
+    final before = provider.rabbits.length;
+    final done = await showRegisterKitsSheet(context, litter);
+    if (done != true || !context.mounted) return;
+    final created = provider.rabbits.length - before;
+    showAppSnack(
+      context,
+      '$created fiche${created > 1 ? 's' : ''} lapin créée${created > 1 ? 's' : ''}',
+    );
+  }
+
+  Future<void> _releaseKits(BuildContext context, Litter litter) async {
+    final done = await showReleaseKitsSheet(context, litter);
+    if (done == true && context.mounted) {
+      showAppSnack(context, 'Lapereaux retirés du cheptel');
+    }
   }
 
   Future<void> _confirmDeleteLitter(
@@ -461,8 +533,9 @@ class MatingDetailScreen extends StatelessWidget {
     if (litter.matingId == null) Navigator.pop(context);
   }
 
-  static Widget _stat(String label, String value, Color color) {
+  static Widget _stat(String label, String value, Color color, {Key? key}) {
     return Expanded(
+      key: key,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

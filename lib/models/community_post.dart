@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'dart:convert';
 import '../services/api_constants.dart';
 
 /// Réactions proposées (identiques à la liste autorisée par le backend).
@@ -127,11 +129,38 @@ class PostMedia {
   final PostMediaType type;
   final String url;
 
-  const PostMedia({required this.id, required this.type, required this.url});
+  /// Aperçu minuscule (JPEG) affiché flouté avant le téléchargement de l'image.
+  final Uint8List? preview;
+  final int width;
+  final int height;
+
+  /// Poids du fichier en octets (0 si inconnu)
+  final int size;
+
+  const PostMedia({
+    required this.id,
+    required this.type,
+    required this.url,
+    this.preview,
+    this.width = 0,
+    this.height = 0,
+    this.size = 0,
+  });
 
   bool get isVideo => type == PostMediaType.video;
 
+  /// Image proposée au téléchargement (aperçu flou disponible).
+  bool get hasPreview => !isVideo && preview != null;
+
   factory PostMedia.fromJson(Map<String, dynamic> json) {
+    int toInt(dynamic v) => v is int ? v : int.tryParse('${v ?? ''}') ?? 0;
+    Uint8List? preview;
+    final raw = json['preview']?.toString() ?? '';
+    if (raw.isNotEmpty) {
+      try {
+        preview = base64Decode(raw);
+      } catch (_) {}
+    }
     return PostMedia(
       id:
           json['id'] is int
@@ -141,6 +170,10 @@ class PostMedia {
           json['media_type'] == 'video'
               ? PostMediaType.video
               : PostMediaType.image,
+      preview: preview,
+      width: toInt(json['width']),
+      height: toInt(json['height']),
+      size: toInt(json['size']),
       url: ApiConstants.formatMediaUrl(json['url']?.toString()),
     );
   }

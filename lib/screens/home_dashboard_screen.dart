@@ -4,14 +4,17 @@ import 'package:provider/provider.dart';
 import '../models/care.dart';
 import '../models/currency.dart';
 import '../providers/auth_provider.dart';
+import '../providers/community_provider.dart';
 import '../providers/breeding_settings_provider.dart';
 import '../providers/marketplace_provider.dart';
 import '../providers/pharmacy_provider.dart';
 import '../providers/promotions_provider.dart';
 import '../providers/rabbit_provider.dart';
+import '../config/features.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/author_avatar.dart';
+import '../widgets/home_sections.dart';
 import '../widgets/chat_icon_button.dart';
 import '../widgets/promo_carousels.dart';
 import '../widgets/wave_edge.dart';
@@ -22,7 +25,6 @@ import 'rabbit_list_screen.dart';
 import 'matings_screen.dart';
 import 'care_screen.dart';
 import 'marketplace_screen.dart';
-import 'pharmacy_screen.dart';
 import '../widgets/app_icon.dart';
 
 /// Horizon du rappel sur la page d'accueil : actions dues dans les 3 prochains
@@ -45,8 +47,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       if (token != null && token.isNotEmpty) {
         context.read<RabbitProvider>().fetchAll(token: token);
       }
-      context.read<PharmacyProvider>().fetchAll();
-      context.read<MarketplaceProvider>().fetchListings();
+      if (Features.pharmacy) context.read<PharmacyProvider>().fetchAll();
+      final community = context.read<CommunityProvider>();
+      if (community.posts.isEmpty) community.fetchPosts(token: token);
+      if (Features.marketplace) {
+        context.read<MarketplaceProvider>().fetchListings();
+      }
       context.read<PromotionsProvider>().fetchCarousels();
     });
   }
@@ -65,85 +71,93 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
         final balance = totalIncome - totalExpense;
         final currency = context.watch<AuthProvider>().currency;
-        final pharmacyProvider = context.watch<PharmacyProvider>();
         final marketplace = context.watch<MarketplaceProvider>();
 
         final topInset = MediaQuery.of(context).padding.top;
 
         return AnnotatedRegion<SystemUiOverlayStyle>(
-          // Icônes de la barre d'état en blanc sur le haut violet
+          // Icônes de la barre d'état en blanc sur le haut sombre
           value: SystemUiOverlayStyle.light,
           child: Scaffold(
             backgroundColor: AppColors.pageBackground,
-            // Pas de fond violet fixe : le haut violet défile avec la page
-            body: RefreshIndicator(
-              edgeOffset: topInset,
-              onRefresh:
-                  () => provider.fetchAll(
-                    token: context.read<AuthProvider>().token,
-                  ),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+            body: Column(
+              children: [
+                // ---- Navbar fixe : Bonjour éleveur, nom de ferme, chat & profil ----
+                Container(
+                  width: double.infinity,
+                  color: const Color(0xFF000000),
+                  padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 14),
+                  child: _buildTopHeader(context),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ---- Haut noir en dégradé : en-tête et résumé de l'activité ----
-                    Container(
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Color(0xFF000000),
-                            Color(0xFF141416),
-                            Color(0xFF1E1E24),
-                          ],
+
+                // ---- Contenu scrollable sous la navbar fixe ----
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh:
+                        () => provider.fetchAll(
+                          token: context.read<AuthProvider>().token,
                         ),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
                       ),
-                      padding: EdgeInsets.fromLTRB(16, topInset + 14, 16, 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 1. En-tête éleveur
-                          _buildTopHeader(context),
+                          // ---- Haut noir en dégradé : résumé de l'activité ----
+                          Container(
+                            width: double.infinity,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Color(0xFF000000),
+                                  Color(0xFF141416),
+                                  Color(0xFF1E1E24),
+                                ],
+                              ),
+                            ),
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Section "Résumé de l'activité" (Scroll horizontal)
+                                const Text(
+                                  'Résumé de l\'activité',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
 
-                          const SizedBox(height: 20),
-
-                          // 2. Section "Résumé de l'activité" (Scroll horizontal)
-                          const Text(
-                            'Résumé de l\'activité',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: -0.3,
+                                _buildHorizontalActivitySummary(
+                                  provider,
+                                  totalIncome,
+                                  totalExpense,
+                                  balance,
+                                  currency,
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 12),
 
-                          _buildHorizontalActivitySummary(
-                            provider,
-                            totalIncome,
-                            totalExpense,
-                            balance,
-                            currency,
-                          ),
-                        ],
-                      ),
-                    ),
+                          // Transition en vague, à cheval sur le carrousel d'annonces
+                          _buildCarouselBridge(context),
 
-                    // Transition en vague, à cheval sur le carrousel d'annonces
-                    _buildCarouselBridge(context),
-
-                    // ---- Bas : fond habituel ----
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                          // ---- Bas : fond habituel ----
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Actions rapides : saillie, lapin, vente, soin
+                          const QuickActions(),
+                          const SizedBox(height: 20),
+
                           // 2bis-b. Rappel : actions à mener dans les prochains jours
                           _buildReminderSection(context, provider),
 
@@ -225,26 +239,38 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Card 4: Petites annonces entre éleveurs
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.storefront_outlined,
-                            title: 'Petites annonces',
-                            subtitle:
-                                'Reproducteurs, matériel, alimentation et saillies entre éleveurs',
-                            badge: '${marketplace.availableCount} annonces',
-                            badgeColor: AppColors.primarySoft,
-                            badgeTextColor: AppColors.primary,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => const MarketplaceScreen(),
-                                ),
-                              );
-                            },
-                          ),
+                          // Card 4: Petites annonces entre éleveurs (masquée pour l'instant)
+                          if (Features.marketplace) ...[
+                            _buildMenuCard(
+                              context: context,
+                              icon: Icons.storefront_outlined,
+                              title: 'Petites annonces',
+                              subtitle:
+                                  'Reproducteurs, matériel, alimentation et saillies entre éleveurs',
+                              badge: '${marketplace.availableCount} annonces',
+                              badgeColor: AppColors.primarySoft,
+                              badgeTextColor: AppColors.primary,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const MarketplaceScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+
+                          // Finances : solde du mois et 6 derniers mois
+                          const HomeSectionTitle('Finances'),
+                          const SizedBox(height: 10),
+                          const FinanceGlance(),
+                          const SizedBox(height: 24),
+
+                          // Communauté : dernières publications et messages non lus
+                          const CommunityGlance(),
                           const SizedBox(height: 30),
                         ],
                       ),
@@ -254,9 +280,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               ),
             ),
           ),
-        );
-      },
-    );
+        ],
+      ),
+    ),
+  );
+},
+);
   }
 
   /// Carrousels d'annonces posés à cheval sur la transition : le noir
@@ -314,8 +343,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// mises bas, soins). Vide si rien n'est dû bientôt ; "Voir plus" ouvre la
   /// page Activité avec toutes les actions, sans limite de délai.
   Widget _buildReminderSection(BuildContext context, RabbitProvider provider) {
-    final breedingSettings =
-        context.watch<BreedingSettingsProvider>().settings;
+    final breedingSettings = context.watch<BreedingSettingsProvider>().settings;
     final all = buildReminders(provider, breedingSettings);
     final nearTerm =
         all.where((i) => i.daysUntilDue <= _reminderHorizonDays).toList();
@@ -511,13 +539,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           ),
           const SizedBox(width: 12),
 
-          // Stat Card 3: Lapereaux au nid
+          // Stat Card 3: Lapereaux présents sans fiche (au nid + sevrés à nommer)
           _buildActivityStatCard(
             icon: AppIcons.nest,
-            value: '${provider.totalKitsInNests}',
+            value: '${provider.totalKitsPresent}',
             label: 'Lapereaux',
-            detail: '${provider.litters.length} portée(s) active(s)',
-            badge: 'Au nid',
+            detail:
+                '${provider.totalKitsInNests} au nid · ${provider.totalKitsToName} à nommer',
+            badge: 'Présents',
           ),
           const SizedBox(width: 12),
 
@@ -560,11 +589,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         color: isHighlighted ? AppColors.primary : Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
-          color: isHighlighted ? AppColors.primary : AppColors.cardBorder,
+          color: isHighlighted ? Colors.white.withAlpha(200) : AppColors.cardBorder,
+          width: isHighlighted ? 1.5 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(isHighlighted ? 15 : 6),
+            color: Colors.black.withAlpha(isHighlighted ? 40 : 6),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),

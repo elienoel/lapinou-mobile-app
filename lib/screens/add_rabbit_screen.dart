@@ -13,6 +13,7 @@ import '../services/api_constants.dart';
 import '../theme/colors.dart';
 import '../widgets/cage_diagram.dart';
 import '../widgets/wave_edge.dart';
+import '../widgets/plan_limit.dart';
 
 class AddRabbitScreen extends StatefulWidget {
   final Rabbit? initialRabbitToEdit;
@@ -456,6 +457,12 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       return;
     }
 
+    // Création seulement : une modification ne change pas le nombre de lapins
+    if (widget.initialRabbitToEdit == null &&
+        !await guardRabbitQuota(context, 1)) {
+      return;
+    }
+    if (!mounted) return;
     final provider = Provider.of<RabbitProvider>(context, listen: false);
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final tag = _tagController.text.trim().toUpperCase();

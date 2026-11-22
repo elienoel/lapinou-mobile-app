@@ -152,7 +152,7 @@ void main() {
       final second = tester.getTopLeft(find.byKey(ValueKey(monthKey(lastMonthDay)))).dx;
       final filter = tester.getTopLeft(find.byKey(const ValueKey('period-filter'))).dx;
       expect(filter < first && first < second, isTrue);
-      expect(find.text(monthLabel(today)), findsOneWidget);
+      expect(find.byKey(ValueKey(monthKey(today))), findsOneWidget);
 
       await tester.ensureVisible(find.byKey(ValueKey(monthKey(lastMonthDay))));
       await tester.pumpAndSettle();

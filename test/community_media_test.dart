@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clap_in/models/community_post.dart';
+import 'package:clap_in/services/media_downloads.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:clap_in/widgets/post_media.dart';
 import 'package:clap_in/widgets/reaction_picker.dart';
 
@@ -64,6 +66,58 @@ void main() {
       'created_at': '2026-01-01T10:00:00Z',
     });
     expect(legacy.media, isEmpty);
+  });
+
+  test('a media parses its blurred preview, size and dimensions', () {
+    final m = PostMedia.fromJson({
+      'id': 4,
+      'media_type': 'image',
+      'url': 'http://x/a.jpg',
+      // GIF 1x1 en base64 : n'importe quelle image fait l'affaire
+      'preview': 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+      'width': 1920,
+      'height': 1440,
+      'size': 1182405,
+    });
+    expect(m.hasPreview, isTrue);
+    expect((m.width, m.height, m.size), (1920, 1440, 1182405));
+    expect(formatFileSize(m.size), '1,1 Mo');
+    expect(formatFileSize(850 * 1024), '850 Ko');
+    expect(PostMedia.fromJson({'id': 1, 'media_type': 'image', 'url': 'u'}).hasPreview, isFalse);
+  });
+
+  testWidgets('an image not downloaded yet shows a blurred preview with its size', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    MediaDownloads.instance.resetForTesting();
+    final media = [
+      PostMedia.fromJson({
+        'id': 7,
+        'media_type': 'image',
+        'url': 'http://localhost:8000/media/big.jpg',
+        'preview': 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+        'size': 2 * 1024 * 1024,
+      }),
+    ];
+    int? opened;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            child: PostMediaGrid(media: media, onOpen: (i) => opened = i),
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const ValueKey('media-download-7')), findsOneWidget);
+    expect(find.text('2,0 Mo'), findsOneWidget);
+    expect(find.byType(ImageFiltered), findsOneWidget);
+    // Toucher lance le téléchargement, sans ouvrir la visionneuse
+    await tester.tap(find.byKey(const ValueKey('media-download-7')));
+    await tester.pump();
+    expect(opened, isNull);
   });
 
   testWidgets('media grid shows every tile up to 4 and a +N counter beyond', (

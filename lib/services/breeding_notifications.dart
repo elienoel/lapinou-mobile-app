@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import '../models/litter.dart';
+import '../models/subscription.dart';
 import '../providers/breeding_settings_provider.dart';
 import '../providers/rabbit_provider.dart';
 import 'reminder_notifications.dart';
@@ -179,4 +180,29 @@ List<ScheduledReminder> breedingNotifications(
   }
 
   return out;
+}
+
+
+/// Fin d'abonnement payé : rappel 3 jours avant et le jour même.
+List<ScheduledReminder> subscriptionNotifications(SubscriptionStatus? status) {
+  final end = status?.periodEnd;
+  if (status == null || !status.isPaid || end == null) return const [];
+  final day = _day(end);
+  final until = 'jusqu’au ${_dayMonth.format(day)}';
+  return [
+    ScheduledReminder(
+      title: 'Abonnement ${status.planName} : fin dans 3 jours',
+      body:
+          'Votre formule est valable $until. Renouvelez-la depuis Profil > Abonnement '
+          'pour continuer à ajouter des lapins.',
+      day: day.subtract(const Duration(days: 3)),
+    ),
+    ScheduledReminder(
+      title: 'Abonnement ${status.planName} : dernier jour',
+      body:
+          'Votre formule se termine aujourd’hui. Sans renouvellement, vous repassez '
+          'à la formule gratuite (4 lapins).',
+      day: day,
+    ),
+  ];
 }

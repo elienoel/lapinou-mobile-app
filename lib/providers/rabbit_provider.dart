@@ -102,6 +102,13 @@ class RabbitProvider extends ChangeNotifier {
   int get totalKitsInNests =>
       _litters.fold(0, (sum, l) => sum + l.kitsRemaining);
 
+  /// Lapereaux présents dans le cheptel sans fiche lapin : au nid ou sevrés à nommer.
+  int get totalKitsPresent => _litters.fold(0, (sum, l) => sum + l.kitsPresent);
+
+  /// Lapereaux sevrés qui attendent encore leur fiche (nom, bague, sexe).
+  int get totalKitsToName =>
+      _litters.fold(0, (sum, l) => sum + l.kitsUnregistered);
+
   /// Portées dont la date de sevrage prévue est passée et qui attendent d'être sevrées.
   int get littersToWeanCount =>
       _litters.where((l) => l.status == LitterStatus.weaningDue).length;
@@ -573,6 +580,13 @@ class RabbitProvider extends ChangeNotifier {
   String _extractError(http.Response response) {
     try {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
+      // Limite d'abonnement : le détail explique quelle formule prendre
+      final message = body['message'];
+      if (message is Map &&
+          message['code'] == 'plan-limit' &&
+          '${message['details'] ?? ''}'.isNotEmpty) {
+        return '${message['details']}';
+      }
       final errors = body['errors'];
       if (errors is Map && errors.isNotEmpty) {
         final first = errors.values.first;
@@ -861,9 +875,10 @@ class RabbitProvider extends ChangeNotifier {
     }
   }
 
-  /// Enregistre un sevrage (total ou partiel) de [count] lapereaux ; si [kits] est renseigné,
-  /// une fiche lapin est créée par lapereau sevré (rattachée à la mère et au père, dans la loge
-  /// de la mère). Renvoie null en cas de succès, sinon le message d'erreur à afficher.
+  /// Enregistre un sevrage (total ou partiel) de [count] lapereaux ; [kits] (au plus [count])
+  /// crée les fiches des lapereaux déjà nommés (rattachées à la portée, dans la loge de la
+  /// mère). Les autres restent « à nommer » : voir [registerKits].
+  /// Renvoie null en cas de succès, sinon le message d'erreur à afficher.
   Future<String?> weanLitter(
     String litterId, {
     required int count,
@@ -885,32 +900,85 @@ class RabbitProvider extends ChangeNotifier {
         return 'Le sevrage ne peut pas précéder la naissance.';
       }
     }
-    if (kits.isNotEmpty && kits.length != count) {
-      return '$count fiche(s) attendue(s), ${kits.length} reçue(s).';
+    if (kits.length > count) {
+      return '$count fiche(s) au plus, ${kits.length} reçue(s).';
     }
+    return _postLitterAction(ApiConstants.litterWeanUrl(litterId), t, {
+      'count': count,
+      'weaned_at':
+          '${weanedAt.year.toString().padLeft(4, '0')}-${weanedAt.month.toString().padLeft(2, '0')}-${weanedAt.day.toString().padLeft(2, '0')}',
+      if (kits.isNotEmpty) 'rabbits': kits.map((k) => k.toJson()).toList(),
+    });
+  }
+
+  /// Crée les fiches de lapereaux déjà sevrés mais pas encore nommés, même après la
+  /// clôture de l'accouplement. [cageId] + [compartment] : loge où les placer (facultatif).
+  Future<String?> registerKits(
+    String litterId, {
+    required List<WeanedKit> kits,
+    String? cageId,
+    int? compartment,
+    String? token,
+  }) async {
+    final t = token ?? _token;
+    if (t == null || t.isEmpty) return 'Session expirée';
+    final available = getLitterById(litterId)?.kitsUnregistered;
+    if (kits.isEmpty) return 'Ajoutez au moins un lapereau.';
+    if (available != null && kits.length > available) {
+      return 'Entre 1 et $available lapereau${available > 1 ? 'x' : ''} à enregistrer.';
+    }
+    return _postLitterAction(ApiConstants.litterRegisterKitsUrl(litterId), t, {
+      'rabbits': kits.map((k) => k.toJson()).toList(),
+      if (cageId != null && compartment != null) ...{
+        'cage': int.tryParse(cageId) ?? cageId,
+        'compartment_number': compartment,
+      },
+    });
+  }
+
+  /// Retire du cheptel [count] lapereaux sevrés sans fiche, vendus ([sold]) ou morts.
+  Future<String?> releaseKits(
+    String litterId, {
+    required int count,
+    required bool sold,
+    String? token,
+  }) async {
+    final t = token ?? _token;
+    if (t == null || t.isEmpty) return 'Session expirée';
+    final available = getLitterById(litterId)?.kitsUnregistered;
+    if (count < 1 || (available != null && count > available)) {
+      return 'Entre 1 et ${available ?? count} lapereau(x) sevré(s) sans fiche.';
+    }
+    return _postLitterAction(ApiConstants.litterReleaseKitsUrl(litterId), t, {
+      'count': count,
+      'reason': sold ? 'sold' : 'died',
+    });
+  }
+
+  /// Envoie une action de portée (sevrage, fiches, sorties) puis rafraîchit portées,
+  /// lapins (nouvelles fiches, mère) et cages. Renvoie null en cas de succès.
+  Future<String?> _postLitterAction(
+    String url,
+    String token,
+    Map<String, dynamic> body,
+  ) async {
     try {
       final response = await http.post(
-        Uri.parse(ApiConstants.litterWeanUrl(litterId)),
-        headers: _headers(t),
-        body: jsonEncode({
-          'count': count,
-          'weaned_at':
-              '${weanedAt.year.toString().padLeft(4, '0')}-${weanedAt.month.toString().padLeft(2, '0')}-${weanedAt.day.toString().padLeft(2, '0')}',
-          if (kits.isNotEmpty) 'rabbits': kits.map((k) => k.toJson()).toList(),
-        }),
+        Uri.parse(url),
+        headers: _headers(token),
+        body: jsonEncode(body),
       );
       if (response.statusCode == 200) {
-        // Portées, lapins (nouvelles fiches, mère) et cages ont changé
         await Future.wait([
-          fetchLitters(token: t),
-          fetchRabbits(token: t),
-          fetchCages(token: t),
+          fetchLitters(token: token),
+          fetchRabbits(token: token),
+          fetchCages(token: token),
         ]);
         return null;
       }
       return _weanError(response);
     } catch (e) {
-      debugPrint('Error weaning litter: $e');
+      debugPrint('Error on litter action $url: $e');
       return 'Impossible de joindre le serveur';
     }
   }
@@ -1553,7 +1621,7 @@ class RabbitProvider extends ChangeNotifier {
   }
 }
 
-/// Un lapereau sevré pour lequel on crée une fiche lapin.
+/// Un lapereau sevré pour lequel on crée une fiche lapin (au sevrage ou plus tard).
 class WeanedKit {
   final String name;
   final String tagNumber;

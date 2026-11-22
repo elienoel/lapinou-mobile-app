@@ -276,8 +276,11 @@ class _MatingsScreenState extends State<MatingsScreen> {
   if (m?.status == MatingStatus.failed) {
     return ('Échec', 'non réussi', AppColors.statusAlertText);
   }
+  final toName = litter?.kitsUnregistered ?? 0;
   if (m?.status == MatingStatus.completed) {
-    return ('Réussi', 'terminé', AppColors.statusActiveText);
+    return toName > 0
+        ? ('$toName', 'à nommer', AppColors.statusActiveText)
+        : ('Réussi', 'terminé', AppColors.statusActiveText);
   }
   if (m != null && m.isActive) {
     final now = DateTime.now();
@@ -296,6 +299,9 @@ class _MatingsScreenState extends State<MatingsScreen> {
       case LitterStatus.weaningDue:
         return ('Sevrage', 'à faire', AppColors.statusAlertText);
       case LitterStatus.weaned:
+        if (m == null && toName > 0) {
+          return ('$toName', 'à nommer', AppColors.statusActiveText);
+        }
         return m == null
             ? ('Sevrée', 'terminé', AppColors.statusActiveText)
             : ('À clôturer', 'sevrage fait', AppColors.statusActiveText);

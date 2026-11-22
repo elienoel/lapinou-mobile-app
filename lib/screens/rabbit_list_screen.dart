@@ -11,6 +11,7 @@ import 'add_rabbit_screen.dart';
 import 'cages_screen.dart';
 import 'rabbit_detail_screen.dart';
 import '../widgets/app_icon.dart';
+import '../widgets/plan_limit.dart';
 
 class RabbitListScreen extends StatefulWidget {
   const RabbitListScreen({super.key});
@@ -29,7 +30,8 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
       r.breed.toLowerCase().contains(query) ||
       r.cageNumber.toLowerCase().contains(query);
 
-  void _addRabbit() {
+  Future<void> _addRabbit() async {
+    if (!await guardRabbitQuota(context, 1) || !mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddRabbitScreen()),
@@ -642,14 +644,7 @@ class _RabbitListScreenState extends State<RabbitListScreen> {
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddRabbitScreen(),
-                ),
-              );
-            },
+            onPressed: _addRabbit,
             icon: const Icon(Icons.add, size: 18),
             label: const Text('Ajouter un reproducteur'),
           ),

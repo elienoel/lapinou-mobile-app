@@ -1,6 +1,9 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../models/community_post.dart';
+import '../services/media_downloads.dart';
 import '../theme/colors.dart';
 
 /// Grille de photos/vidéos d'une publication, façon Facebook :
@@ -86,7 +89,11 @@ class PostMediaGrid extends StatelessWidget {
   Widget _tile(int index, double width, double height, {int extra = 0}) {
     final item = media[index];
     return GestureDetector(
-      onTap: () => onOpen(index),
+      onTap: () {
+        final downloads = MediaDownloads.instance;
+        if (item.hasPreview && !downloads.isDownloaded(item.url)) return;
+        onOpen(index);
+      },
       child: SizedBox(
         width: width,
         height: height,
@@ -104,35 +111,10 @@ class PostMediaGrid extends StatelessWidget {
                   ),
                 ),
               )
+            else if (item.hasPreview)
+              _DownloadableImage(item: item)
             else
-              Image.network(
-                item.url,
-                fit: BoxFit.cover,
-                loadingBuilder:
-                    (context, child, progress) =>
-                        progress == null
-                            ? child
-                            : Container(
-                              color: Colors.white,
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      color: Colors.white,
-                      child: const Icon(
-                        Icons.broken_image_outlined,
-                        color: Color(0xFF9CA3AF),
-                      ),
-                    ),
-              ),
+              _networkImage(item.url),
             if (extra > 0)
               Container(
                 color: Colors.black54,
@@ -149,6 +131,119 @@ class PostMediaGrid extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+Widget _networkImage(String url) => Image.network(
+  url,
+  fit: BoxFit.cover,
+  loadingBuilder:
+      (context, child, progress) =>
+          progress == null
+              ? child
+              : Container(
+                color: AppColors.secondarySoft,
+                child: const Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                ),
+              ),
+  errorBuilder:
+      (_, __, ___) => Container(
+        color: AppColors.secondarySoft,
+        child: const Icon(
+          Icons.broken_image_outlined,
+          color: Color(0xFF9CA3AF),
+        ),
+      ),
+);
+
+/// Image pas encore téléchargée : aperçu flou et bouton « Télécharger » avec
+/// le poids du fichier. Une fois téléchargée, l'image nette s'affiche.
+class _DownloadableImage extends StatelessWidget {
+  const _DownloadableImage({required this.item});
+
+  final PostMedia item;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: MediaDownloads.instance,
+      builder: (context, _) {
+        final downloads = MediaDownloads.instance;
+        if (downloads.isDownloaded(item.url)) return _networkImage(item.url);
+        final loading = downloads.isLoading(item.url);
+        final size = formatFileSize(item.size);
+        return GestureDetector(
+          key: ValueKey('media-download-${item.id}'),
+          onTap: loading ? null : () => downloads.download(context, item.url),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRect(
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: Image.memory(
+                    item.preview!,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
+                ),
+              ),
+              Container(color: Colors.black.withAlpha(25)),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(110),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      loading
+                          ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          )
+                          : const Icon(
+                            Icons.download_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                      if (size.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          size,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

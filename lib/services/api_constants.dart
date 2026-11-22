@@ -93,6 +93,17 @@ class ApiConstants {
   static String litterDetailUrl(String id) => '$baseUrl/farm/litters/$id/';
   static String litterWeanUrl(String id) => '$baseUrl/farm/litters/$id/wean/';
 
+  // Abonnements : formule en vigueur et paiement GeniusPay
+  static String get subscriptionStatusUrl => '$baseUrl/subscriptions/status/';
+  static String get subscriptionCheckoutUrl =>
+      '$baseUrl/subscriptions/checkout/';
+  static String subscriptionPaymentRefreshUrl(String reference) =>
+      '$baseUrl/subscriptions/payments/$reference/refresh/';
+  static String litterRegisterKitsUrl(String id) =>
+      '$baseUrl/farm/litters/$id/register-kits/';
+  static String litterReleaseKitsUrl(String id) =>
+      '$baseUrl/farm/litters/$id/release-kits/';
+
   // Soins & entretien : types de soins, soins effectués et rappels
   static String get careTreatmentsUrl => '$baseUrl/farm/care-treatments/';
   static String careTreatmentDetailUrl(String id) =>

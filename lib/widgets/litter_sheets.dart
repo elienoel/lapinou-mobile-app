@@ -7,9 +7,10 @@ import '../models/rabbit.dart';
 import '../providers/rabbit_provider.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
+import 'plan_limit.dart';
 
 /// Feuille « Sevrer la portée » : date, nombre de lapereaux sevrés et, si on le souhaite,
-/// une fiche lapin par lapereau. Renvoie true quand le sevrage a été enregistré.
+/// une fiche lapin pour tout ou partie d'entre eux (les autres se nomment plus tard). Renvoie true quand le sevrage a été enregistré.
 Future<bool?> showWeanLitterSheet(BuildContext context, Litter litter) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -107,249 +108,78 @@ class _KitRow {
   }
 }
 
-class WeanLitterSheet extends StatefulWidget {
-  final Litter litter;
-
-  const WeanLitterSheet({super.key, required this.litter});
-
-  @override
-  State<WeanLitterSheet> createState() => _WeanLitterSheetState();
-}
-
-class _WeanLitterSheetState extends State<WeanLitterSheet> {
-  late int _count;
-  late DateTime _date;
-  bool _createRecords = true;
-  bool _saving = false;
-  String? _error;
-  final List<_KitRow> _rows = [];
+/// Fiches des lapereaux à nommer (nom, bague, sexe), partagées par le sevrage
+/// et l'enregistrement différé des lapereaux sevrés.
+mixin _KitRowsEditor<T extends StatefulWidget> on State<T> {
+  final List<_KitRow> rows = [];
   // Index des lignes à corriger après une tentative d'envoi
-  final Set<int> _invalid = {};
+  final Set<int> invalid = {};
 
-  Litter get litter => widget.litter;
+  Litter get kitsLitter;
 
-  @override
-  void initState() {
-    super.initState();
-    _count = litter.kitsRemaining;
-    _date = DateTime.now();
-    _syncRows();
-  }
+  Rabbit? get mother =>
+      context.read<RabbitProvider>().getRabbitById(kitsLitter.motherId);
 
-  @override
-  void dispose() {
-    for (final r in _rows) {
-      r.dispose();
-    }
-    super.dispose();
-  }
-
-  Rabbit? get _mother =>
-      context.read<RabbitProvider>().getRabbitById(litter.motherId);
-
-  /// Une ligne par lapereau sevré ; les lignes déjà remplies sont conservées.
-  void _syncRows() {
-    final motherTag = _mother?.tagNumber ?? '';
-    while (_rows.length < _count) {
-      final n = _rows.length + 1;
-      // La numérotation continue après les sevrages précédents pour éviter les bagues en double
-      final serial = litter.weaned + n;
-      _rows.add(
+  /// [count] lignes ; les lignes déjà remplies sont conservées.
+  void syncRows(int count) {
+    final motherTag = mother?.tagNumber ?? '';
+    while (rows.length < count) {
+      // La numérotation continue après les fiches déjà créées pour éviter les bagues en double
+      final serial = kitsLitter.registeredCount + rows.length + 1;
+      rows.add(
         _KitRow('Petit $serial', motherTag.isEmpty ? '' : '$motherTag-$serial'),
       );
     }
-    while (_rows.length > _count) {
-      _rows.removeLast().dispose();
+    while (rows.length > count) {
+      rows.removeLast().dispose();
     }
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: litter.birthDate,
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) setState(() => _date = picked);
+  void disposeRows() {
+    for (final r in rows) {
+      r.dispose();
+    }
   }
 
   /// Vérifie les fiches avant envoi ; renvoie un message si quelque chose manque.
-  String? _validateRows() {
-    _invalid.clear();
+  String? validateRows() {
+    invalid.clear();
     final seen = <String>{};
     String? message;
-    for (int i = 0; i < _rows.length; i++) {
-      final r = _rows[i];
+    for (int i = 0; i < rows.length; i++) {
+      final r = rows[i];
       final tag = r.tag.text.trim().toUpperCase();
       if (r.name.text.trim().isEmpty) {
-        _invalid.add(i);
+        invalid.add(i);
         message ??= 'Lapereau ${i + 1} : donnez-lui un nom.';
       } else if (tag.isEmpty) {
-        _invalid.add(i);
+        invalid.add(i);
         message ??= 'Lapereau ${i + 1} : indiquez sa bague.';
       } else if (!seen.add(tag)) {
-        _invalid.add(i);
+        invalid.add(i);
         message ??=
             'Lapereau ${i + 1} : la bague $tag est déjà utilisée dans cette liste.';
       } else if (r.gender == null) {
-        _invalid.add(i);
-        message ??= 'Lapereau ${i + 1} : choisissez ♂ ou ♀.';
+        invalid.add(i);
+        message ??= 'Lapereau ${i + 1} : choisissez mâle ou femelle.';
       }
     }
     return message;
   }
 
-  Future<void> _submit() async {
-    if (_createRecords) {
-      final problem = _validateRows();
-      if (problem != null) {
-        setState(() => _error = problem);
-        return;
-      }
-    }
-    setState(() {
-      _saving = true;
-      _error = null;
-      _invalid.clear();
-    });
+  List<WeanedKit> get kits => [
+    for (final r in rows)
+      WeanedKit(
+        name: r.name.text.trim(),
+        tagNumber: r.tag.text.trim().toUpperCase(),
+        gender: r.gender!,
+        color: mother?.color,
+      ),
+  ];
 
-    final provider = context.read<RabbitProvider>();
-    final mother = _mother;
-    final error = await provider.weanLitter(
-      litter.id,
-      count: _count,
-      weanedAt: _date,
-      kits:
-          _createRecords
-              ? [
-                for (final r in _rows)
-                  WeanedKit(
-                    name: r.name.text.trim(),
-                    tagNumber: r.tag.text.trim().toUpperCase(),
-                    gender: r.gender!,
-                    color: mother?.color,
-                  ),
-              ]
-              : const [],
-    );
-    if (!mounted) return;
-    if (error == null) {
-      Navigator.pop(context, true);
-    } else {
-      setState(() {
-        _saving = false;
-        _error = error;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final mother = _mother;
-    final inCage = mother != null && mother.cageId != null;
-    final remaining = litter.kitsRemaining;
-
-    return SheetBody(
-      children: [
-        Text(
-          'Sevrer la portée de ${mother?.name ?? 'la mère'}',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '$remaining lapereau${remaining > 1 ? 'x' : ''} au nid · né${litter.bornAlive > 1 ? 's' : ''} le '
-          '${formatDate(litter.birthDate)} (J${litter.ageDays})',
-          style: const TextStyle(
-            fontSize: 12.5,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        InkWell(
-          key: const ValueKey('wean-date'),
-          onTap: _pickDate,
-          borderRadius: BorderRadius.circular(12),
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'Date du sevrage',
-              prefixIcon: Icon(Icons.event_outlined, size: 20),
-            ),
-            child: Text(formatDate(_date)),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _Stepper(
-          label: 'Lapereaux sevrés',
-          value: _count,
-          min: 1,
-          max: remaining,
-          valueKey: const ValueKey('wean-count'),
-          onChanged:
-              (v) => setState(() {
-                _count = v;
-                _syncRows();
-              }),
-        ),
-        if (_count < remaining)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              'Sevrage partiel : ${remaining - _count} resteront au nid avec leur mère.',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-        const SizedBox(height: 8),
-        SwitchListTile(
-          key: const ValueKey('wean-create-records'),
-          contentPadding: EdgeInsets.zero,
-          activeColor: AppColors.primary,
-          title: const Text(
-            'Créer les fiches lapins',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          subtitle: Text(
-            inCage
-                ? 'Rattachées à la mère et au père, dans sa cage (${mother.cageNumber}).'
-                : 'Rattachées à la mère et au père.',
-            style: const TextStyle(fontSize: 12),
-          ),
-          value: _createRecords,
-          onChanged: _saving ? null : (v) => setState(() => _createRecords = v),
-        ),
-        if (_createRecords) ...[
-          for (int i = 0; i < _rows.length; i++) _buildKitRow(i),
-        ],
-        if (_error != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _error!,
-            key: const ValueKey('wean-error'),
-            style: TextStyle(
-              color: Colors.red.shade700,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-        const SizedBox(height: 14),
-        SubmitButton(
-          key: const ValueKey('wean-submit'),
-          label:
-              _createRecords
-                  ? 'Sevrer $_count et créer les fiches'
-                  : 'Sevrer $_count lapereau${_count > 1 ? 'x' : ''}',
-          saving: _saving,
-          onPressed: _submit,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKitRow(int i) {
-    final r = _rows[i];
-    final bad = _invalid.contains(i);
+  Widget buildKitRow(int i) {
+    final r = rows[i];
+    final bad = invalid.contains(i);
     return Container(
       key: ValueKey('kit-row-$i'),
       margin: const EdgeInsets.only(top: 10),
@@ -410,11 +240,8 @@ class _WeanLitterSheetState extends State<WeanLitterSheet> {
               selectedForegroundColor: Colors.white,
             ),
             segments: const [
-              ButtonSegment(value: RabbitGender.male, label: Text('♂ Mâle')),
-              ButtonSegment(
-                value: RabbitGender.female,
-                label: Text('♀ Femelle'),
-              ),
+              ButtonSegment(value: RabbitGender.male, label: Text('Mâle')),
+              ButtonSegment(value: RabbitGender.female, label: Text('Femelle')),
             ],
             selected: {if (r.gender != null) r.gender!},
             onSelectionChanged:
@@ -422,6 +249,476 @@ class _WeanLitterSheetState extends State<WeanLitterSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+Widget _hint(String text, {Key? key}) => Padding(
+  padding: const EdgeInsets.only(top: 2),
+  child: Text(
+    text,
+    key: key,
+    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+  ),
+);
+
+Widget _errorText(String error) => Padding(
+  padding: const EdgeInsets.only(top: 8),
+  child: Text(
+    error,
+    key: const ValueKey('wean-error'),
+    style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w600),
+  ),
+);
+
+class WeanLitterSheet extends StatefulWidget {
+  final Litter litter;
+
+  const WeanLitterSheet({super.key, required this.litter});
+
+  @override
+  State<WeanLitterSheet> createState() => _WeanLitterSheetState();
+}
+
+class _WeanLitterSheetState extends State<WeanLitterSheet>
+    with _KitRowsEditor<WeanLitterSheet> {
+  late int _count;
+  late DateTime _date;
+  // Le sexe se voit souvent mal au sevrage : on nomme plus tard par défaut
+  bool _nameNow = false;
+  late int _named;
+  bool _saving = false;
+  String? _error;
+
+  Litter get litter => widget.litter;
+
+  @override
+  Litter get kitsLitter => litter;
+
+  @override
+  void initState() {
+    super.initState();
+    _count = litter.kitsRemaining;
+    _named = _count;
+    _date = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    disposeRows();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: litter.birthDate,
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  void _setNamed(int value) {
+    _named = value.clamp(1, _count);
+    syncRows(_nameNow ? _named : 0);
+  }
+
+  Future<void> _submit() async {
+    if (_nameNow) {
+      final problem = validateRows();
+      if (problem != null) {
+        setState(() => _error = problem);
+        return;
+      }
+      if (!await guardRabbitQuota(context, rows.length) || !mounted) return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+      invalid.clear();
+    });
+
+    final error = await context.read<RabbitProvider>().weanLitter(
+      litter.id,
+      count: _count,
+      weanedAt: _date,
+      kits: _nameNow ? kits : const [],
+    );
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() {
+        _saving = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mother = this.mother;
+    final inCage = mother != null && mother.cageId != null;
+    final remaining = litter.kitsRemaining;
+    final later = _nameNow ? _count - _named : _count;
+
+    return SheetBody(
+      children: [
+        Text(
+          'Sevrer la portée de ${mother?.name ?? 'la mère'}',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$remaining lapereau${remaining > 1 ? 'x' : ''} au nid · né${litter.bornAlive > 1 ? 's' : ''} le '
+          '${formatDate(litter.birthDate)} (J${litter.ageDays})',
+          style: const TextStyle(
+            fontSize: 12.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        InkWell(
+          key: const ValueKey('wean-date'),
+          onTap: _pickDate,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Date du sevrage',
+              prefixIcon: Icon(Icons.event_outlined, size: 20),
+            ),
+            child: Text(formatDate(_date)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _Stepper(
+          label: 'Lapereaux sevrés',
+          value: _count,
+          min: 1,
+          max: remaining,
+          valueKey: const ValueKey('wean-count'),
+          onChanged:
+              (v) => setState(() {
+                // « tous nommés » suit le nombre sevré ; un choix partiel est conservé
+                final allNamed = _named == _count;
+                _count = v;
+                _setNamed(allNamed || _named > v ? v : _named);
+              }),
+        ),
+        if (_count < remaining)
+          _hint(
+            'Sevrage partiel : ${remaining - _count} resteront au nid avec leur mère.',
+          ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          key: const ValueKey('wean-create-records'),
+          contentPadding: EdgeInsets.zero,
+          activeColor: AppColors.primary,
+          title: const Text(
+            'Nommer des lapereaux maintenant',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: Text(
+            inCage
+                ? 'Fiches rattachées à la portée, dans la cage de la mère (${mother.cageNumber}).'
+                : 'Fiches rattachées à la portée, à la mère et au père.',
+            style: const TextStyle(fontSize: 12),
+          ),
+          value: _nameNow,
+          onChanged:
+              _saving
+                  ? null
+                  : (v) => setState(() {
+                    _nameNow = v;
+                    _setNamed(_count);
+                  }),
+        ),
+        if (_nameNow && _count > 1)
+          _Stepper(
+            label: 'À nommer maintenant',
+            value: _named,
+            min: 1,
+            max: _count,
+            valueKey: const ValueKey('wean-named-count'),
+            onChanged: (v) => setState(() => _setNamed(v)),
+          ),
+        if (later > 0)
+          _hint(
+            '$later lapereau${later > 1 ? 'x' : ''} à nommer plus tard : '
+            '${later > 1 ? 'ils restent comptés' : 'il reste compté'} dans le cheptel.',
+            key: const ValueKey('wean-later-hint'),
+          ),
+        if (_nameNow) ...[for (int i = 0; i < rows.length; i++) buildKitRow(i)],
+        if (_error != null) _errorText(_error!),
+        const SizedBox(height: 14),
+        SubmitButton(
+          key: const ValueKey('wean-submit'),
+          label:
+              _nameNow
+                  ? 'Sevrer $_count et créer ${rows.length} fiche${rows.length > 1 ? 's' : ''}'
+                  : 'Sevrer $_count lapereau${_count > 1 ? 'x' : ''}',
+          saving: _saving,
+          onPressed: _submit,
+        ),
+      ],
+    );
+  }
+}
+
+/// Feuille « Nommer les lapereaux » : crée les fiches de lapereaux déjà sevrés,
+/// à tout moment (même accouplement clôturé). Renvoie true une fois enregistré.
+Future<bool?> showRegisterKitsSheet(BuildContext context, Litter litter) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => RegisterKitsSheet(litter: litter),
+  );
+}
+
+class RegisterKitsSheet extends StatefulWidget {
+  final Litter litter;
+
+  const RegisterKitsSheet({super.key, required this.litter});
+
+  @override
+  State<RegisterKitsSheet> createState() => _RegisterKitsSheetState();
+}
+
+class _RegisterKitsSheetState extends State<RegisterKitsSheet>
+    with _KitRowsEditor<RegisterKitsSheet> {
+  late int _count;
+  bool _withMother = false;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  Litter get kitsLitter => widget.litter;
+
+  @override
+  void initState() {
+    super.initState();
+    _count = widget.litter.kitsUnregistered;
+    syncRows(_count);
+  }
+
+  @override
+  void dispose() {
+    disposeRows();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final problem = validateRows();
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+    if (!await guardRabbitQuota(context, rows.length) || !mounted) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final m = mother;
+    final error = await context.read<RabbitProvider>().registerKits(
+      widget.litter.id,
+      kits: kits,
+      cageId: _withMother ? m?.cageId : null,
+      compartment: _withMother ? m?.compartmentNumber : null,
+    );
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() {
+        _saving = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final litter = widget.litter;
+    final available = litter.kitsUnregistered;
+    final m = mother;
+    final motherPlaced = m?.cageId != null && m?.compartmentNumber != null;
+    return SheetBody(
+      children: [
+        const Text(
+          'Nommer les lapereaux',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$available sevré${available > 1 ? 's' : ''} sans fiche · portée de '
+          '${m?.name ?? 'la mère'} née le ${formatDate(litter.birthDate)}',
+          style: const TextStyle(
+            fontSize: 12.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (available > 1)
+          _Stepper(
+            label: 'Lapereaux à enregistrer',
+            value: _count,
+            min: 1,
+            max: available,
+            valueKey: const ValueKey('register-count'),
+            onChanged:
+                (v) => setState(() {
+                  _count = v;
+                  syncRows(v);
+                }),
+          ),
+        if (_count < available)
+          _hint(
+            '${available - _count} resteront à nommer, toujours comptés dans le cheptel.',
+          ),
+        if (motherPlaced)
+          SwitchListTile(
+            key: const ValueKey('register-with-mother'),
+            contentPadding: EdgeInsets.zero,
+            activeColor: AppColors.primary,
+            title: const Text(
+              'Placer dans la loge de la mère',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              _withMother
+                  ? 'Cage ${m!.cageNumber}, loge ${m.compartmentNumber}.'
+                  : 'Sinon, sans cage : vous pourrez les placer depuis leur fiche.',
+              style: const TextStyle(fontSize: 12),
+            ),
+            value: _withMother,
+            onChanged: _saving ? null : (v) => setState(() => _withMother = v),
+          )
+        else
+          _hint('Sans cage pour l’instant : placez-les depuis leur fiche.'),
+        for (int i = 0; i < rows.length; i++) buildKitRow(i),
+        if (_error != null) _errorText(_error!),
+        const SizedBox(height: 14),
+        SubmitButton(
+          key: const ValueKey('register-submit'),
+          label: 'Créer ${rows.length} fiche${rows.length > 1 ? 's' : ''}',
+          saving: _saving,
+          onPressed: _submit,
+        ),
+      ],
+    );
+  }
+}
+
+/// Feuille « Vendus ou morts » : retire du cheptel des lapereaux sevrés sans fiche.
+Future<bool?> showReleaseKitsSheet(BuildContext context, Litter litter) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => ReleaseKitsSheet(litter: litter),
+  );
+}
+
+class ReleaseKitsSheet extends StatefulWidget {
+  final Litter litter;
+
+  const ReleaseKitsSheet({super.key, required this.litter});
+
+  @override
+  State<ReleaseKitsSheet> createState() => _ReleaseKitsSheetState();
+}
+
+class _ReleaseKitsSheetState extends State<ReleaseKitsSheet> {
+  int _count = 1;
+  bool _sold = true;
+  bool _saving = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final error = await context.read<RabbitProvider>().releaseKits(
+      widget.litter.id,
+      count: _count,
+      sold: _sold,
+    );
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() {
+        _saving = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final available = widget.litter.kitsUnregistered;
+    final left = available - _count;
+    return SheetBody(
+      children: [
+        const Text(
+          'Lapereaux vendus ou morts',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$available sevré${available > 1 ? 's' : ''} sans fiche dans cette portée',
+          style: const TextStyle(
+            fontSize: 12.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 14),
+        SegmentedButton<bool>(
+          key: const ValueKey('release-reason'),
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            selectedBackgroundColor: AppColors.primary,
+            selectedForegroundColor: Colors.white,
+          ),
+          segments: const [
+            ButtonSegment(value: true, label: Text('Vendus')),
+            ButtonSegment(value: false, label: Text('Morts')),
+          ],
+          selected: {_sold},
+          onSelectionChanged: (v) => setState(() => _sold = v.first),
+        ),
+        const SizedBox(height: 10),
+        _Stepper(
+          label: 'Nombre de lapereaux',
+          value: _count,
+          min: 1,
+          max: available,
+          valueKey: const ValueKey('release-count'),
+          onChanged: (v) => setState(() => _count = v),
+        ),
+        _hint(
+          left > 0
+              ? 'Il en restera $left dans le cheptel, à nommer.'
+              : 'Plus aucun lapereau sans fiche dans cette portée.',
+        ),
+        if (_error != null) _errorText(_error!),
+        const SizedBox(height: 14),
+        SubmitButton(
+          key: const ValueKey('release-submit'),
+          label: 'Retirer $_count lapereau${_count > 1 ? 'x' : ''}',
+          saving: _saving,
+          onPressed: _submit,
+        ),
+      ],
     );
   }
 }

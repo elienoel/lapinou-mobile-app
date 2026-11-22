@@ -11,6 +11,7 @@ import 'providers/chat_provider.dart';
 import 'providers/pharmacy_provider.dart';
 import 'providers/marketplace_provider.dart';
 import 'providers/promotions_provider.dart';
+import 'providers/subscription_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -68,6 +69,12 @@ class ClapInApp extends StatelessWidget {
           update:
               (_, auth, market) =>
                   (market ?? MarketplaceProvider())..setToken(auth.token),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, SubscriptionProvider>(
+          create: (_) => SubscriptionProvider(),
+          update:
+              (_, auth, sub) =>
+                  (sub ?? SubscriptionProvider())..setToken(auth.token),
         ),
         ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create: (_) => ChatProvider(),

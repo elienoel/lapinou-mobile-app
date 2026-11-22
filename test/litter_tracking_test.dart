@@ -11,6 +11,7 @@ import 'package:clap_in/services/local_database.dart';
 import 'package:clap_in/models/cage.dart';
 import 'package:clap_in/models/litter.dart';
 import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/breeding_settings_provider.dart';
 import 'package:clap_in/providers/rabbit_provider.dart';
 import 'package:clap_in/screens/add_rabbit_screen.dart';
 import 'package:clap_in/screens/cages_screen.dart';
@@ -32,6 +33,8 @@ Litter _litter(
   int stillBorn = 0,
   int died = 0,
   int? weaned,
+  int registered = 0,
+  int sold = 0,
   String mother = 'p-f-2',
   String? father = 'p-m-2',
   DateTime? weaningDate,
@@ -45,6 +48,8 @@ Litter _litter(
       stillBorn: stillBorn,
       diedCount: died,
       weanedCount: weaned,
+      registeredCount: registered,
+      weanedSoldCount: sold,
       weaningDate: weaningDate,
     );
 
@@ -108,6 +113,7 @@ Future<RabbitProvider> _pump(
     providers: [
       ChangeNotifierProvider<RabbitProvider>.value(value: provider),
       ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ChangeNotifierProvider(create: (_) => BreedingSettingsProvider()),
     ],
     child: MaterialApp(home: home),
   ));
@@ -147,6 +153,17 @@ void main() {
       expect(weaned.kitsRemaining, 0);
       expect(weaned.status, LitterStatus.weaned);
       expect(_litter('d', alive: 5, weaned: 2, died: 1).kitsRemaining, 2);
+    });
+
+    test('weaned kits without a record stay present in the herd', () {
+      // 8 nés : 2 au nid, 6 sevrés dont 2 nommés et 1 vendu -> 3 à nommer
+      final l = _litter('k', alive: 8, weaned: 6, registered: 2, sold: 1);
+      expect((l.kitsRemaining, l.kitsUnregistered, l.kitsPresent), (2, 3, 5));
+      final parsed = Litter.fromJson({
+        'id': 1, 'mother': 2, 'birth_date': '2026-09-01', 'born_alive': 5,
+        'weaned_count': 5, 'registered_count': 1, 'weaned_sold_count': 1, 'weaned_died_count': 1,
+      });
+      expect((parsed.kitsUnregistered, parsed.kitsPresent), (2, 2));
     });
 
     test('a custom planned weaning date drives the countdown', () {
@@ -219,7 +236,7 @@ void main() {
       await _pump(tester, const MatingsScreen(), litters: [
         _litter('n1', daysOld: 12, alive: 7, stillBorn: 1, died: 1),
         _litter('d1', daysOld: 50, alive: 5),
-        _litter('w1', daysOld: 60, alive: 4, weaned: 4),
+        _litter('w1', daysOld: 60, alive: 4, weaned: 4, registered: 4),
       ]);
       // au nid (6 = 7 nés vivants - 1 mort) et sevrage en retard : en cours
       final n1 = find.byKey(const ValueKey('litter-n1'));
@@ -253,8 +270,9 @@ void main() {
       expect(find.text('Sevrage en retard de 5 j'), findsOneWidget);
 
       await _pump(tester, const MatingDetailScreen(litterId: 'w1'), litters: [
-        _litter('w1', daysOld: 60, alive: 4, weaned: 4),
+        _litter('w1', daysOld: 60, alive: 4, weaned: 4, registered: 4),
       ]);
+      expect(find.byKey(const ValueKey('register-kits-w1')), findsNothing, reason: 'tous ont leur fiche');
       expect(find.byKey(const ValueKey('wean-w1')), findsNothing, reason: 'plus rien à sevrer');
       expect(find.text('Sevrage terminé'), findsOneWidget);
     });
@@ -281,6 +299,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Sevrer la portée de Luna'), findsOneWidget);
         expect(tester.widget<Text>(find.byKey(const ValueKey('wean-count'))).data, '3');
+        // à nommer plus tard par défaut : le sexe se voit souvent mal au sevrage
+        expect(find.byKey(const ValueKey('kit-row-0')), findsNothing);
+        await tester.tap(find.byKey(const ValueKey('wean-create-records')));
+        await tester.pump();
         for (final i in [0, 1, 2]) {
           expect(find.byKey(ValueKey('kit-row-$i')), findsOneWidget);
         }
@@ -288,13 +310,13 @@ void main() {
         // sans sexe choisi : refus local, aucune requête
         await tester.tap(find.byKey(const ValueKey('wean-submit')));
         await tester.pumpAndSettle();
-        expect(find.text('Lapereau 1 : choisissez ♂ ou ♀.'), findsOneWidget);
+        expect(find.text('Lapereau 1 : choisissez mâle ou femelle.'), findsOneWidget);
         expect(api.requests.where((r) => r.startsWith('POST')), isEmpty);
 
         for (final i in [0, 1, 2]) {
           await tester.tap(find.descendant(
             of: find.byKey(ValueKey('kit-gender-$i')),
-            matching: find.text(i == 1 ? '♀ Femelle' : '♂ Mâle'),
+            matching: find.text(i == 1 ? 'Femelle' : 'Mâle'),
           ));
           await tester.pump();
         }
@@ -329,11 +351,8 @@ void main() {
         await tester.tap(find.byTooltip('Moins')); // 4 -> 3
         await tester.pump();
         expect(find.text('Sevrage partiel : 2 resteront au nid avec leur mère.'), findsOneWidget);
-        expect(find.byKey(const ValueKey('kit-row-3')), findsNothing);
-
-        await tester.tap(find.byKey(const ValueKey('wean-create-records')));
-        await tester.pump();
         expect(find.byKey(const ValueKey('kit-row-0')), findsNothing);
+        expect(find.text('3 lapereaux à nommer plus tard : ils restent comptés dans le cheptel.'), findsOneWidget);
         expect(find.text('Sevrer 3 lapereaux'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('wean-submit')));
         await tester.pumpAndSettle();
@@ -361,8 +380,10 @@ void main() {
       await http.runWithClient(() async {
         await tester.tap(find.byKey(const ValueKey('wean-n1')));
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('wean-create-records')));
+        await tester.pump();
         for (final i in [0, 1]) {
-          await tester.tap(find.descendant(of: find.byKey(ValueKey('kit-gender-$i')), matching: find.text('♂ Mâle')));
+          await tester.tap(find.descendant(of: find.byKey(ValueKey('kit-gender-$i')), matching: find.text('Mâle')));
           await tester.pump();
         }
         await tester.tap(find.byKey(const ValueKey('wean-submit')));
@@ -371,6 +392,92 @@ void main() {
 
       expect(find.text('Lapereau 2 : La bague K1 est déjà utilisée dans votre élevage.'), findsOneWidget);
       expect(find.text('Sevrer la portée de Luna'), findsOneWidget);
+    });
+
+    testWidgets('only some kits can be named at weaning', (tester) async {
+      final api = _Api();
+      await _pump(tester, const MatingDetailScreen(litterId: 'n1'), litters: [_litter('n1', alive: 3)]);
+
+      await http.runWithClient(() async {
+        await tester.tap(find.byKey(const ValueKey('wean-n1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('wean-create-records')));
+        await tester.pump();
+        // À nommer maintenant : 3 -> 1
+        final minus = find.descendant(
+          of: find.ancestor(of: find.byKey(const ValueKey('wean-named-count')), matching: find.byType(Row)),
+          matching: find.byTooltip('Moins'),
+        );
+        await tester.tap(minus);
+        await tester.pump();
+        await tester.tap(minus);
+        await tester.pump();
+        expect(find.byKey(const ValueKey('kit-row-1')), findsNothing);
+        expect(find.text('2 lapereaux à nommer plus tard : ils restent comptés dans le cheptel.'), findsOneWidget);
+        await tester.tap(find.descendant(of: find.byKey(const ValueKey('kit-gender-0')), matching: find.text('Femelle')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('wean-submit')));
+        await tester.pumpAndSettle();
+      }, api.client);
+
+      final body = api.bodyOf(api.last('POST')!);
+      expect(body['count'], 3);
+      expect((body['rabbits'] as List).single, containsPair('gender', 'F'));
+    });
+
+    testWidgets('weaned kits can be named later, even once the litter is done', (tester) async {
+      final api = _Api();
+      await _pump(tester, const MatingDetailScreen(litterId: 'w2'), litters: [
+        _litter('w2', daysOld: 70, alive: 5, weaned: 4, died: 1, registered: 1),
+      ]);
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('litter-present-w2'))).data,
+        '3 lapereaux présents dans le cheptel : 3 sevrés à nommer',
+      );
+      expect(find.byKey(const ValueKey('wean-w2')), findsNothing);
+
+      await http.runWithClient(() async {
+        await tester.tap(find.byKey(const ValueKey('register-kits-w2')));
+        await tester.pumpAndSettle();
+        expect(find.text('Nommer les lapereaux'), findsWidgets);
+        expect(find.byKey(const ValueKey('kit-row-2')), findsOneWidget);
+        await tester.tap(find.byTooltip('Moins')); // 3 -> 2
+        await tester.pump();
+        // la numérotation reprend après la fiche déjà créée
+        expect(tester.widget<TextField>(find.byKey(const ValueKey('kit-name-0'))).controller!.text, 'Petit 2');
+        for (final i in [0, 1]) {
+          await tester.tap(find.descendant(of: find.byKey(ValueKey('kit-gender-$i')), matching: find.text('Mâle')));
+          await tester.pump();
+        }
+        await tester.tap(find.byKey(const ValueKey('register-submit')));
+        await tester.pumpAndSettle();
+      }, api.client);
+
+      final post = api.last('POST')!;
+      expect(post, contains('/litters/w2/register-kits/'));
+      final body = api.bodyOf(post);
+      expect((body['rabbits'] as List).length, 2);
+      expect(body.containsKey('cage'), isFalse, reason: 'sans cage par défaut');
+    });
+
+    testWidgets('weaned kits sold before being named leave the herd', (tester) async {
+      final api = _Api();
+      await _pump(tester, const MatingDetailScreen(litterId: 'w3'), litters: [
+        _litter('w3', daysOld: 70, alive: 4, weaned: 4),
+      ]);
+      await http.runWithClient(() async {
+        await tester.tap(find.byKey(const ValueKey('release-kits-w3')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Plus')); // 1 -> 2
+        await tester.pump();
+        expect(find.text('Il en restera 2 dans le cheptel, à nommer.'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('release-submit')));
+        await tester.pumpAndSettle();
+      }, api.client);
+
+      final post = api.last('POST')!;
+      expect(post, contains('/litters/w3/release-kits/'));
+      expect(api.bodyOf(post), {'count': 2, 'reason': 'sold'});
     });
 
     testWidgets('editing a litter sends the corrected counts', (tester) async {
@@ -410,7 +517,7 @@ void main() {
       expect(find.text('Date de la mise bas *'), findsOneWidget);
       expect(find.text(_fmt(now)), findsOneWidget);
       expect(find.text("Aujourd'hui"), findsOneWidget);
-      expect(find.text('Sevrage prévu le ${_fmt(now.add(const Duration(days: 45)))}'), findsOneWidget);
+      expect(find.text('Sevrage prévu le ${_fmt(now.add(const Duration(days: 45)))} (à 45 jours)'), findsOneWidget);
     });
 
     testWidgets('a late registration keeps the real birth date and derives the weaning date from it', (tester) async {
@@ -432,7 +539,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text(_fmt(target)), findsOneWidget);
-        expect(find.text('Sevrage prévu le ${_fmt(target.add(const Duration(days: 45)))}'), findsOneWidget);
+        expect(find.text('Sevrage prévu le ${_fmt(target.add(const Duration(days: 45)))} (à 45 jours)'), findsOneWidget);
 
         await tester.tap(find.text('Enregistrer la Portée'));
         await tester.pumpAndSettle();

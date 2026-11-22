@@ -2,6 +2,7 @@ import '../widgets/app_ui.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -450,12 +451,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     ].join(' · ');
 
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: AppColors.secondarySoft,
       appBar: AppBar(
         titleSpacing: 0,
+        backgroundColor: AppColors.secondary,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         title: Row(
           children: [
-            AuthorAvatar(name: _other.name, url: _other.avatar, radius: 18),
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: AuthorAvatar(
+                name: _other.name,
+                url: _other.avatar,
+                radius: 18,
+              ),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -467,7 +483,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: Colors.white,
                     ),
                   ),
                   if (subtitle.isNotEmpty)
@@ -477,7 +493,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       style: const TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.normal,
-                        color: AppColors.textSecondary,
+                        color: Colors.white70,
                       ),
                     ),
                 ],
@@ -488,7 +504,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
-          Expanded(child: _buildBody(me)),
+          Expanded(
+            child: CustomPaint(
+              painter: const _ChatBackdropPainter(),
+              child: _buildBody(me),
+            ),
+          ),
           if (_pendingImage != null) _buildPendingImage(),
           _buildComposer(),
         ],
@@ -499,7 +520,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget _buildBody(int me) {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+        child: CircularProgressIndicator(color: AppColors.secondary),
       );
     }
     if (_loadFailed) {
@@ -524,10 +545,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.waving_hand_outlined,
-              size: 42,
-              color: AppColors.textSecondary,
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withAlpha(30),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.waving_hand_outlined,
+                size: 36,
+                color: AppColors.secondary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -591,15 +619,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppColors.cardBorder),
+          color: AppColors.secondary.withAlpha(34),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           chatDayLabel(date),
           style: const TextStyle(
             fontSize: 11.5,
-            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+            color: AppColors.secondaryDark,
           ),
         ),
       ),
@@ -662,12 +690,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildComposer() {
-    return Material(
-      color: Colors.white,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.secondary.withAlpha(30),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
+          padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
           child: _recording ? _buildRecordingBar() : _buildInputRow(),
         ),
       ),
@@ -683,7 +721,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           tooltip: 'Joindre une photo',
           icon: const Icon(
             Icons.add_photo_alternate_outlined,
-            color: AppColors.primary,
+            color: AppColors.secondary,
           ),
           onPressed: _showAttachOptions,
         ),
@@ -702,7 +740,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 vertical: 10,
               ),
               filled: true,
-              fillColor: AppColors.backgroundGrey,
+              fillColor: AppColors.secondarySoft,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(22),
                 borderSide: BorderSide.none,
@@ -712,10 +750,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
         const SizedBox(width: 6),
         Container(
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
+          decoration: _sendDecoration,
           child: IconButton(
             tooltip: canSend ? 'Envoyer' : 'Enregistrer une note vocale',
             icon: Icon(
@@ -771,10 +806,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
         ),
         Container(
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
+          decoration: _sendDecoration,
           child: IconButton(
             tooltip: 'Envoyer la note vocale',
             icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
@@ -784,6 +816,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ],
     );
   }
+}
+
+/// Bouton d'envoi : rond en dégradé violet.
+const _sendDecoration = BoxDecoration(
+  shape: BoxShape.circle,
+  gradient: LinearGradient(
+    colors: [AppColors.secondary, AppColors.secondaryDark],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  ),
+);
+
+/// Fond de la discussion : semis de petits points violets très légers.
+class _ChatBackdropPainter extends CustomPainter {
+  const _ChatBackdropPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dot = Paint()..color = AppColors.secondary.withAlpha(22);
+    const step = 26.0;
+    var row = 0;
+    for (double y = 8; y < size.height; y += step, row++) {
+      final offset = row.isEven ? 0.0 : step / 2;
+      for (double x = 8 + offset; x < size.width; x += step) {
+        canvas.drawCircle(Offset(x, y), 1.6, dot);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChatBackdropPainter oldDelegate) => false;
 }
 
 class _MessageBubble extends StatelessWidget {
@@ -816,7 +879,7 @@ class _MessageBubble extends StatelessWidget {
       return Icon(
         m.isRead ? Icons.done_all : Icons.done,
         size: 15,
-        color: m.isRead ? const Color(0xFF7DD3FC) : metaColor,
+        color: m.isRead ? const Color(0xFFB9F3FF) : metaColor,
       );
     }
 
@@ -832,7 +895,23 @@ class _MessageBubble extends StatelessWidget {
             maxWidth: MediaQuery.of(context).size.width * 0.78,
           ),
           decoration: BoxDecoration(
-            color: isMine ? AppColors.primary : Colors.white,
+            color: isMine ? null : Colors.white,
+            gradient:
+                isMine
+                    ? const LinearGradient(
+                      colors: [AppColors.secondary, AppColors.secondaryDark],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                    : null,
+            boxShadow: [
+              BoxShadow(
+                color: (isMine ? AppColors.secondaryDark : Colors.black)
+                    .withAlpha(isMine ? 45 : 14),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(16),
               topRight: const Radius.circular(16),

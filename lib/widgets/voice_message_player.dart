@@ -116,7 +116,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final fg = widget.isMine ? Colors.white : AppColors.primary;
+    final fg = widget.isMine ? Colors.white : AppColors.secondary;
     final soft = widget.isMine ? Colors.white38 : AppColors.primarySoftBorder;
     final meta = widget.isMine ? Colors.white70 : const Color(0xFF64748B);
 
@@ -136,7 +136,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: widget.isMine ? Colors.white : AppColors.primary,
+                color: widget.isMine ? Colors.white : AppColors.secondary,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -145,7 +145,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
                     : (_playing
                         ? Icons.pause_rounded
                         : Icons.play_arrow_rounded),
-                color: widget.isMine ? AppColors.primary : Colors.white,
+                color: widget.isMine ? AppColors.secondary : Colors.white,
                 size: 26,
               ),
             ),

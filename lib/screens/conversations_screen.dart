@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/chat.dart';
 import '../providers/auth_provider.dart';
@@ -66,12 +67,16 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
+        backgroundColor: AppColors.secondary,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         title: const Text(
           'Messages',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            color: Colors.white,
           ),
         ),
       ),
@@ -84,12 +89,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         onPressed: _newChat,
       ),
       body: RefreshIndicator(
-        color: AppColors.primary,
+        color: AppColors.secondary,
         onRefresh: chat.fetchConversations,
         child:
             chat.isLoading && list.isEmpty
                 ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
+                  child: CircularProgressIndicator(color: AppColors.secondary),
                 )
                 : list.isEmpty
                 ? _buildEmpty()
@@ -114,11 +119,18 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         SizedBox(height: MediaQuery.of(context).size.height * 0.22),
-        const Center(
-          child: Icon(
-            Icons.chat_bubble_outline,
-            size: 48,
-            color: AppColors.textSecondary,
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withAlpha(30),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.chat_bubble_outline,
+              size: 40,
+              color: AppColors.secondary,
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -157,7 +169,22 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            AuthorAvatar(name: c.other.name, url: c.other.avatar, radius: 26),
+            // Anneau violet autour de l'avatar quand il y a des messages non lus
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: unread ? AppColors.secondary : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+              child: AuthorAvatar(
+                name: c.other.name,
+                url: c.other.avatar,
+                radius: 24,
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -186,7 +213,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                 unread ? FontWeight.w700 : FontWeight.normal,
                             color:
                                 unread
-                                    ? AppColors.primary
+                                    ? AppColors.secondary
                                     : AppColors.textSecondary,
                           ),
                         ),
@@ -219,7 +246,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: AppColors.secondary,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(

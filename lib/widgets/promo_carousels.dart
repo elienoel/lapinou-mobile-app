@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/features.dart';
 import '../models/promo_carousel.dart';
 import '../providers/promotions_provider.dart';
 import '../screens/activity_screen.dart';
@@ -233,10 +234,11 @@ Future<void> openPromoSlide(BuildContext context, PromoSlide slide) async {
       Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 
   switch (slide.targetScreen) {
+    // Modules masqués dans cette version : l'annonce ne mène nulle part
     case 'pharmacy':
-      push(const PharmacyScreen());
+      if (Features.pharmacy) push(const PharmacyScreen());
     case 'marketplace':
-      push(const MarketplaceScreen());
+      if (Features.marketplace) push(const MarketplaceScreen());
     case 'rabbits':
       push(const RabbitListScreen());
     case 'reproduction':

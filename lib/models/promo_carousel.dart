@@ -1,3 +1,5 @@
+import '../config/features.dart';
+
 /// Annonce (image 16:9) d'un carrousel de la page d'accueil, gérée dans
 /// l'admin Django (`promotions`). Un appui ouvre un écran de l'app, un site
 /// web, ou rien.
@@ -23,6 +25,16 @@ class PromoSlide {
     this.targetScreen,
     this.externalUrl,
   });
+
+  /// Faux pour une annonce qui mène vers un module masqué dans cette version.
+  bool get isAvailable {
+    if (linkType != 'internal') return true;
+    return switch (targetScreen) {
+      'pharmacy' => Features.pharmacy,
+      'marketplace' => Features.marketplace,
+      _ => true,
+    };
+  }
 
   factory PromoSlide.fromJson(Map<String, dynamic> json) {
     String? nonEmpty(dynamic v) =>
@@ -57,6 +69,6 @@ class PromoCarousel {
     slides: [
       for (final s in (json['slides'] as List? ?? const []))
         PromoSlide.fromJson(Map<String, dynamic>.from(s as Map)),
-    ].where((s) => s.imageUrl.isNotEmpty).toList(),
+    ].where((s) => s.imageUrl.isNotEmpty && s.isAvailable).toList(),
   );
 }

@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:clap_in/providers/pharmacy_provider.dart';
 import 'package:clap_in/providers/promotions_provider.dart';
-import 'package:clap_in/screens/pharmacy_screen.dart';
 import 'package:clap_in/widgets/promo_carousels.dart';
 
 Map<String, dynamic> slide(int id, {String link = 'none', String? screen}) => {
@@ -75,13 +74,18 @@ void main() {
     expect(find.byType(PromoCarouselView), findsNothing);
   });
 
-  testWidgets('slides auto-advance and a tap opens the linked screen', (tester) async {
+  testWidgets('slides auto-advance; ads to hidden modules are left out', (tester) async {
     final promos = PromotionsProvider(
       client: server([
         {
           'id': 1,
           'name': 'Accueil',
-          'slides': [slide(1, link: 'internal', screen: 'pharmacy'), slide(2)],
+          'slides': [
+            // la pharmacie est masquée dans cette version : annonce écartée
+            slide(1, link: 'internal', screen: 'pharmacy'),
+            slide(2),
+            slide(3),
+          ],
         },
       ]),
     );
@@ -89,23 +93,16 @@ void main() {
     await tester.runAsync(promos.fetchCarousels);
     await tester.pump();
 
-    expect(find.byType(PromoCarouselView), findsOneWidget);
+    expect(promos.carousels.single.slides.map((s) => s.id), [2, 3]);
     final page = find.byType(PageView);
     expect(tester.widget<PageView>(page).controller!.page, 0);
 
-    // Défilement automatique après 5 s
+    // Défilement automatique après 5 s, puis retour au début
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.widget<PageView>(page).controller!.page, 1);
-
-    // Retour à la première, qui mène à la pharmacie
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.widget<PageView>(page).controller!.page, 0);
-
-    await tester.tap(page);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byType(PharmacyScreen), findsOneWidget);
   });
 }

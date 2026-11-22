@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/breeding_settings_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../providers/rabbit_provider.dart';
 import '../services/breeding_notifications.dart';
 import '../services/reminder_notifications.dart';
@@ -33,6 +34,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   RabbitProvider? _rabbits;
   BreedingSettingsProvider? _breedingSettings;
+  SubscriptionProvider? _subscription;
 
   @override
   void initState() {
@@ -47,6 +49,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _breedingSettings =
           context.read<BreedingSettingsProvider>()
             ..addListener(_scheduleReminders);
+      try {
+        _subscription =
+            context.read<SubscriptionProvider>()
+              ..addListener(_scheduleReminders)
+              ..fetch();
+      } on ProviderNotFoundException {
+        _subscription = null;
+      }
       _scheduleReminders();
     });
   }
@@ -55,6 +65,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void dispose() {
     _rabbits?.removeListener(_scheduleReminders);
     _breedingSettings?.removeListener(_scheduleReminders);
+    _subscription?.removeListener(_scheduleReminders);
     super.dispose();
   }
 
@@ -63,9 +74,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (provider == null) return;
     final settings =
         _breedingSettings?.settings ?? BreedingSettings.defaults;
-    ReminderNotifications.instance.schedule(
-      breedingNotifications(provider, settings),
-    );
+    ReminderNotifications.instance.schedule([
+      ...breedingNotifications(provider, settings),
+      ...subscriptionNotifications(_subscription?.status),
+    ]);
   }
 
   void _onTabSelected(int index) {

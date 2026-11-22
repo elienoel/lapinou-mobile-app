@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:clap_in/services/connectivity_service.dart';
 import 'package:clap_in/models/mating.dart';
 import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/breeding_settings_provider.dart';
 import 'package:clap_in/providers/rabbit_provider.dart';
 import 'package:clap_in/models/litter.dart';
 import 'package:clap_in/screens/mating_detail_screen.dart';
@@ -94,6 +95,7 @@ Future<RabbitProvider> _pump(
     providers: [
       ChangeNotifierProvider<RabbitProvider>.value(value: provider),
       ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ChangeNotifierProvider(create: (_) => BreedingSettingsProvider()),
     ],
     child: MaterialApp(home: home),
   ));

@@ -11,6 +11,7 @@ import 'package:clap_in/providers/marketplace_provider.dart';
 import 'package:clap_in/providers/promotions_provider.dart';
 import 'package:clap_in/providers/rabbit_provider.dart';
 import 'package:clap_in/providers/auth_provider.dart';
+import 'package:clap_in/providers/breeding_settings_provider.dart';
 import 'package:clap_in/providers/community_provider.dart';
 import 'package:clap_in/providers/chat_provider.dart';
 import 'package:clap_in/screens/home_dashboard_screen.dart';
@@ -79,6 +80,7 @@ void main() {
             value: communityProvider,
           ),
           ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
+          ChangeNotifierProvider(create: (_) => BreedingSettingsProvider()),
           ChangeNotifierProvider<PharmacyProvider>(create: (_) => PharmacyProvider()),
           ChangeNotifierProvider<MarketplaceProvider>(create: (_) => MarketplaceProvider()),
           ChangeNotifierProvider<PromotionsProvider>(create: (_) => PromotionsProvider()),
@@ -112,6 +114,7 @@ void main() {
             create: (_) => CommunityProvider(),
           ),
           ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
+          ChangeNotifierProvider(create: (_) => BreedingSettingsProvider()),
           ChangeNotifierProvider<PharmacyProvider>(create: (_) => PharmacyProvider()),
           ChangeNotifierProvider<MarketplaceProvider>(create: (_) => MarketplaceProvider()),
           ChangeNotifierProvider<PromotionsProvider>(create: (_) => PromotionsProvider()),
@@ -121,14 +124,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.descendant(
-        of: find.byType(Row),
-        matching: find.text('Communauté'),
+    // l'accueil a aussi une section « Communauté » : on vise la barre du bas
+    final navTab = find.descendant(
+      of: find.byWidget(
+        tester.widget<Scaffold>(find.byType(Scaffold).first).bottomNavigationBar!,
       ),
-      findsOneWidget,
+      matching: find.text('Communauté'),
     );
-    await tester.tap(find.text('Communauté'));
+    expect(navTab, findsOneWidget);
+    await tester.tap(navTab);
     await tester.pumpAndSettle();
     expect(find.text('Fil d\'actualité'), findsOneWidget);
 

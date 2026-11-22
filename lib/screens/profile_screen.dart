@@ -7,12 +7,16 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/rabbit_provider.dart';
+import '../models/subscription.dart';
+import '../providers/subscription_provider.dart';
+import '../utils/formatters.dart';
 import '../services/sync_service.dart';
 import '../theme/colors.dart';
 import '../theme/radius.dart';
 import '../widgets/author_avatar.dart';
 import '../widgets/wave_edge.dart';
 import 'settings_screen.dart';
+import 'subscription_screen.dart';
 
 /// Profil de l'éleveur : photo, informations personnelles, statistiques et gestion du compte.
 class ProfileScreen extends StatefulWidget {
@@ -237,69 +241,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final topInset = MediaQuery.of(context).padding.top;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      // Icônes de la barre d'état en blanc sur le haut violet
+      // Icônes de la barre d'état en blanc sur le haut sombre
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ---- Haut noir en dégradé : identité et statistiques ----
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF000000),
-                      Color(0xFF141416),
-                      Color(0xFF1E1E24),
-                    ],
-                  ),
-                ),
-                padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: _buildSettingsButton(),
+        body: Column(
+          children: [
+            // ---- Navbar fixe du profil : Titre Profil & bouton Paramètres ----
+            Container(
+              width: double.infinity,
+              color: const Color(0xFF000000),
+              padding: EdgeInsets.fromLTRB(16, topInset + 10, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Mon profil',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
                     ),
-                    const SizedBox(height: 20),
-                    _buildHeader(user),
-                    const SizedBox(height: 24),
-                    _buildStats(rabbits),
-                  ],
-                ),
+                  ),
+                  _buildSettingsButton(),
+                ],
               ),
-              const WaveEdge(color: Color(0xFF1E1E24)),
+            ),
 
-              // ---- Bas blanc : le compte ----
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+            // ---- Contenu défilant sous la navbar fixe ----
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Compte',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
+                    // ---- Haut noir en dégradé : identité et statistiques ----
+                    Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xFF000000),
+                            Color(0xFF141416),
+                            Color(0xFF1E1E24),
+                          ],
+                        ),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildHeader(user),
+                          const SizedBox(height: 24),
+                          _buildStats(rabbits),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    _buildPersonalInfo(user),
-                    const Divider(height: 1),
-                    _buildAccountCard(user),
+                    const WaveEdge(color: Color(0xFF1E1E24)),
+
+                    // ---- Bas blanc : le compte ----
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Compte',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildPersonalInfo(user),
+                          const Divider(height: 1),
+                          _buildAccountCard(user),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -329,7 +357,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Ligne de liste pleine largeur : icône, libellé, et chevron si elle mène quelque part.
+  /// « Gratuit · 3 lapins sur 4 », « Éleveur · jusqu'au 21/12/2026 »
+  String _subscriptionLine() {
+    final SubscriptionStatus? status;
+    try {
+      status = context.watch<SubscriptionProvider>().status;
+    } on ProviderNotFoundException {
+      return 'Formules et paiement';
+    }
+    if (status == null) return 'Formules et paiement';
+    if (status.isPaid && status.periodEnd != null) {
+      return '${status.planName} · jusqu’au ${formatDate(status.periodEnd!)}';
+    }
+    final limit = status.limit;
+    return limit == null
+        ? status.planName
+        : '${status.planName} · ${status.rabbitCount} lapins sur $limit';
+  }
+
   Widget _menuRow({
+    Key? key,
     required IconData icon,
     required String title,
     String? subtitle,
@@ -337,6 +384,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Color color = AppColors.textPrimary,
   }) {
     return InkWell(
+      key: key,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -825,6 +873,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Membre depuis le ${DateFormat('d MMMM yyyy', 'fr_FR').format(user.createdAt!.toLocal())}',
           ),
         ],
+        const Divider(height: 1),
+        _menuRow(
+          key: const ValueKey('profile-subscription'),
+          icon: Icons.workspace_premium_outlined,
+          title: 'Abonnement',
+          subtitle: _subscriptionLine(),
+          onTap:
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+              ),
+        ),
         const Divider(height: 1),
         _menuRow(
           icon: Icons.logout_rounded,

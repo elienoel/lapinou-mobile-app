@@ -31,6 +31,13 @@ class Litter {
 
   /// Date PRÉVUE de sevrage (~45 jours)
   final DateTime? weaningDate;
+
+  /// Lapereaux sevrés qui ont reçu une fiche lapin
+  final int registeredCount;
+
+  /// Lapereaux sevrés sans fiche sortis du cheptel (vendus, morts)
+  final int weanedSoldCount;
+  final int weanedDiedCount;
   final String? notes;
 
   const Litter({
@@ -45,6 +52,9 @@ class Litter {
     this.weanedCount,
     this.weanedAt,
     this.weaningDate,
+    this.registeredCount = 0,
+    this.weanedSoldCount = 0,
+    this.weanedDiedCount = 0,
     this.notes,
   });
 
@@ -54,6 +64,15 @@ class Litter {
 
   /// Lapereaux encore au nid : nés vivants, ni sevrés ni morts.
   int get kitsRemaining => math.max(bornAlive - weaned - diedCount, 0);
+
+  /// Lapereaux sevrés encore dans le cheptel sans fiche : ni nommés, ni placés en cage.
+  int get kitsUnregistered => math.max(
+    weaned - registeredCount - weanedSoldCount - weanedDiedCount,
+    0,
+  );
+
+  /// Lapereaux de la portée présents sans fiche : au nid + sevrés à nommer.
+  int get kitsPresent => kitsRemaining + kitsUnregistered;
 
   /// Âge de la portée en jours (0 le jour de la naissance).
   int get ageDays =>
@@ -110,6 +129,9 @@ class Litter {
       weanedCount: weanedCount,
       weanedAt: weanedAt,
       weaningDate: weaningDate ?? this.weaningDate,
+      registeredCount: registeredCount,
+      weanedSoldCount: weanedSoldCount,
+      weanedDiedCount: weanedDiedCount,
       notes: clearNotes ? null : (notes ?? this.notes),
     );
   }
@@ -146,6 +168,9 @@ class Litter {
           json['weaned_count'] == null ? null : _int(json['weaned_count']),
       weanedAt: parsedWeanedAt,
       weaningDate: parsedWeaningDate,
+      registeredCount: _int(json['registered_count']),
+      weanedSoldCount: _int(json['weaned_sold_count']),
+      weanedDiedCount: _int(json['weaned_died_count']),
       notes: json['notes'],
     );
   }

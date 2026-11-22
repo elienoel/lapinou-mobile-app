@@ -19,7 +19,14 @@ const String _addCategoryValue = '__add_category__';
 class FinancesScreen extends StatefulWidget {
   final int initialFilterIndex; // 0: Tout, 1: Dépenses, 2: Ventes
 
-  const FinancesScreen({super.key, this.initialFilterIndex = 0});
+  const FinancesScreen({
+    super.key,
+    this.initialFilterIndex = 0,
+    this.openSaleForm = false,
+  });
+
+  /// Ouvre directement le formulaire d'une nouvelle vente (raccourci de l'accueil).
+  final bool openSaleForm;
 
   @override
   State<FinancesScreen> createState() => _FinancesScreenState();
@@ -34,6 +41,13 @@ class _FinancesScreenState extends State<FinancesScreen> {
   void initState() {
     super.initState();
     _selectedFilterIndex = widget.initialFilterIndex;
+    if (widget.openSaleForm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showTransactionForm(context, context.read<RabbitProvider>(), true);
+        }
+      });
+    }
   }
 
   /// Ouvre le choix d'une période libre : tout l'historique, une année, ou
@@ -75,27 +89,27 @@ class _FinancesScreenState extends State<FinancesScreen> {
   }
 
   /// Filtre de la page : le bouton « Filtrer » (période libre), puis les mois,
-  /// du plus récent au plus ancien.
+  /// du plus récent au plus ancien, au format carré 1:1.
   Widget _buildPeriodBar(List<FinanceTransaction> finances) {
     final isMonth = _period.kind == FinancePeriodKind.month;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _periodChip(
+          _filterButtonSquare(
             key: const ValueKey('period-filter'),
             label: isMonth ? 'Filtrer' : _period.label,
-            icon: Icons.tune_rounded,
             selected: !isMonth,
             onTap: () => _openPeriodSheet(finances),
           ),
           const SizedBox(width: 8),
           for (final month in _months(finances)) ...[
-            _periodChip(
+            _monthSquareCard(
               key: ValueKey(
                 'period-month-${month.start!.year}-${month.start!.month}',
               ),
-              label: month.label,
+              month: month,
               selected: _period == month,
               onTap: () => setState(() => _period = month),
             ),
@@ -106,43 +120,101 @@ class _FinancesScreenState extends State<FinancesScreen> {
     );
   }
 
-  Widget _periodChip({
+  Widget _filterButtonSquare({
     required Key key,
     required String label,
     required bool selected,
     required VoidCallback onTap,
-    IconData? icon,
   }) {
     final fg = selected ? Colors.white : AppColors.textSecondary;
     return InkWell(
       key: key,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(2),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        width: 50,
+        height: 50,
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(2),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.cardBorder,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16, color: fg),
-              const SizedBox(width: 6),
-            ],
+            Icon(Icons.tune_rounded, size: 16, color: fg),
+            const SizedBox(height: 2),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 9.5,
                 fontWeight: FontWeight.w700,
                 color: fg,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _monthSquareCard({
+    required Key key,
+    required FinancePeriod month,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final fg = selected ? Colors.white : AppColors.textPrimary;
+    final date = month.start ?? DateTime.now();
+    // Ex: "nov"
+    final monthShort = DateFormat('MMM', 'fr_FR').format(date).replaceAll('.', '').toUpperCase();
+    // Ex: "26" pour 2026
+    final yearShort = DateFormat('yy', 'fr_FR').format(date);
+
+    return InkWell(
+      key: key,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(2),
+      child: Semantics(
+        label: month.label,
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : Colors.white,
+            borderRadius: BorderRadius.circular(2),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.cardBorder,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                monthShort,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: fg,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                yearShort,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white.withAlpha(210) : AppColors.textSecondary,
+                  height: 1.1,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -360,7 +432,8 @@ class _FinancesScreenState extends State<FinancesScreen> {
                                               : Colors.orange.shade900,
                                     ),
                                     decoration: InputDecoration(
-                                      labelText: 'Montant (${currency.symbol}) *',
+                                      labelText:
+                                          'Montant (${currency.symbol}) *',
                                       border: InputBorder.none,
                                       enabledBorder: InputBorder.none,
                                       focusedBorder: InputBorder.none,
@@ -369,9 +442,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
                                       filled: false,
                                       contentPadding: EdgeInsets.zero,
                                       hintText:
-                                          currency.decimals == 0
-                                              ? '0'
-                                              : '0.00',
+                                          currency.decimals == 0 ? '0' : '0.00',
                                       hintStyle: TextStyle(
                                         fontSize: 32,
                                         fontWeight: FontWeight.w800,
@@ -1091,7 +1162,8 @@ class _FinancesScreenState extends State<FinancesScreen> {
     FinanceTransaction fin,
     AppCurrency currency,
   ) {
-    final dateUpper = DateFormat('dd MMM yyyy', 'fr_FR').format(fin.date).toUpperCase();
+    final dateUpper =
+        DateFormat('dd MMM yyyy', 'fr_FR').format(fin.date).toUpperCase();
 
     return InkWell(
       key: ValueKey('tx-${fin.id}'),
@@ -1106,9 +1178,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-        decoration: const BoxDecoration(
-          color: Colors.transparent,
-        ),
+        decoration: const BoxDecoration(color: Colors.transparent),
         child: Row(
           children: [
             BanknoteStackIcon(
