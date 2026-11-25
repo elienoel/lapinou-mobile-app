@@ -42,6 +42,9 @@ class RabbitProvider extends ChangeNotifier {
 
   RabbitProvider() {
     // Initial state is empty, synced with Django backend
+    SyncService.instance.onSyncCompleted = () {
+      reloadAllFromLocal();
+    };
   }
 
   /// Appelé par le ProxyProvider de `main.dart` pendant la construction des
@@ -61,6 +64,41 @@ class RabbitProvider extends ChangeNotifier {
         }
       });
     }
+  }
+
+  /// Recharge immédiatement toutes les données depuis la base SQLite locale
+  /// sans faire d'appel réseau. Utile après un pull de synchronisation.
+  Future<void> reloadAllFromLocal() async {
+    final localRabbits = await LocalDatabase.instance.getAll(SyncEntity.rabbit);
+    _rabbits = localRabbits.map((r) => Rabbit.fromJson(r.data)).toList();
+
+    final localCages = await LocalDatabase.instance.getAll(SyncEntity.cage);
+    _cages = localCages.map((c) => Cage.fromJson(c.data)).toList();
+
+    final localMatings = await LocalDatabase.instance.getAll(SyncEntity.mating);
+    _matings = localMatings.map((m) => Mating.fromJson(m.data)).toList();
+
+    final localLitters = await LocalDatabase.instance.getAll(SyncEntity.litter);
+    _litters = localLitters.map((l) => Litter.fromJson(l.data)).toList();
+
+    final localEvents = await LocalDatabase.instance.getAll(SyncEntity.careEvent);
+    _careEvents = localEvents.map((c) => CareEvent.fromJson(c.data)).toList();
+
+    final localTreatments = await LocalDatabase.instance.getAll(
+      SyncEntity.careTreatment,
+    );
+    _careTreatments =
+        localTreatments.map((c) => CareTreatment.fromJson(c.data)).toList();
+
+    final localRecords = await LocalDatabase.instance.getAll(
+      SyncEntity.careRecord,
+    );
+    _careRecords = localRecords.map((c) => CareRecord.fromJson(c.data)).toList();
+
+    final localFinances = await LocalDatabase.instance.getAll(SyncEntity.finance);
+    _finances = localFinances.map((f) => FinanceTransaction.fromJson(f.data)).toList();
+
+    notifyListeners();
   }
 
   bool get isLoading => _isLoading;
@@ -219,7 +257,7 @@ class RabbitProvider extends ChangeNotifier {
   /// qu'une connexion est disponible (voir [SyncService]).
   Future<void> fetchRabbits({String? token}) => _syncFromServer<Rabbit>(
     entity: SyncEntity.rabbit,
-    url: ApiConstants.rabbitsUrl,
+    url: '${ApiConstants.rabbitsUrl}?all=true',
     fromJson: Rabbit.fromJson,
     assign: (list) => _rabbits = list,
     label: 'rabbits',
@@ -343,6 +381,12 @@ class RabbitProvider extends ChangeNotifier {
           final idx = _rabbits.indexWhere((r) => r.id == rabbitId);
           if (idx != -1) {
             _rabbits[idx] = updatedRabbit;
+            await LocalDatabase.instance.upsertLocal(
+              SyncEntity.rabbit,
+              updatedRabbit.id,
+              updatedRabbit.toJson(),
+              isDirty: false,
+            );
             notifyListeners();
           }
           return true;
@@ -375,6 +419,12 @@ class RabbitProvider extends ChangeNotifier {
           final idx = _rabbits.indexWhere((r) => r.id == rabbitId);
           if (idx != -1) {
             _rabbits[idx] = updatedRabbit;
+            await LocalDatabase.instance.upsertLocal(
+              SyncEntity.rabbit,
+              updatedRabbit.id,
+              updatedRabbit.toJson(),
+              isDirty: false,
+            );
             notifyListeners();
           }
           return true;
@@ -601,7 +651,7 @@ class RabbitProvider extends ChangeNotifier {
   /// 2. Accouplements (Saillies)
   Future<void> fetchMatings({String? token}) => _syncFromServer<Mating>(
     entity: SyncEntity.mating,
-    url: ApiConstants.matingsUrl,
+    url: '${ApiConstants.matingsUrl}?all=true',
     fromJson: Mating.fromJson,
     assign: (list) => _matings = list,
     label: 'matings',
@@ -801,7 +851,7 @@ class RabbitProvider extends ChangeNotifier {
   /// 3. Mises bas (Portées)
   Future<void> fetchLitters({String? token}) => _syncFromServer<Litter>(
     entity: SyncEntity.litter,
-    url: ApiConstants.littersUrl,
+    url: '${ApiConstants.littersUrl}?all=true',
     fromJson: Litter.fromJson,
     assign: (list) => _litters = list,
     label: 'litters',
@@ -1009,7 +1059,7 @@ class RabbitProvider extends ChangeNotifier {
   /// 4. Soins et Vaccinations
   Future<void> fetchCareEvents({String? token}) => _syncFromServer<CareEvent>(
     entity: SyncEntity.careEvent,
-    url: ApiConstants.careEventsUrl,
+    url: '${ApiConstants.careEventsUrl}?all=true',
     fromJson: CareEvent.fromJson,
     assign: (list) => _careEvents = list,
     label: 'care events',

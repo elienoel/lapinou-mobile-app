@@ -45,6 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Clap&apos;in a besoin d'accéder à l'appareil photo pour vous permettre de prendre des photos de vos lapins ou publications.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

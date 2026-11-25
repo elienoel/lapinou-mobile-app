@@ -32,44 +32,33 @@ void main() {
     await tester.pumpAndSettle();
 
     // Étape 1 : photo, nom et date de naissance (pas de bouton Retour)
-    expect(find.text('Identité'), findsOneWidget);
     expect(find.text('Étape 1/3'), findsOneWidget);
-    expect(find.text('Ajouter une photo'), findsOneWidget);
+    expect(find.byKey(const ValueKey('photo-frame')), findsOneWidget);
     expect(find.byKey(const ValueKey('birth-date')), findsOneWidget);
     expect(find.byKey(const ValueKey('gender-male')), findsNothing);
     expect(find.byKey(const ValueKey('wizard-back')), findsNothing);
 
     // Pas de labels, seulement des placeholders
     expect(find.text('Nom du lapin'), findsOneWidget);
-    expect(find.text('Date de naissance'), findsOneWidget);
 
-    // Sans nom ni date, on reste sur l'étape 1
+    // Sans nom, on reste sur l'étape 1
     await tester.tap(find.byKey(const ValueKey('wizard-next')));
     await tester.pumpAndSettle();
     expect(find.text('Veuillez saisir un nom'), findsOneWidget);
-    expect(find.text('Choisissez la date de naissance'), findsOneWidget);
     expect(find.text('Étape 1/3'), findsOneWidget);
 
     await tester.enterText(find.byType(TextFormField).first, 'Noisette');
-    await tester.tap(find.byKey(const ValueKey('birth-date')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-    expect(find.text('Date de naissance'), findsNothing);
-    expect(find.textContaining(' mois'), findsOneWidget); // l'âge s'affiche
     await tester.tap(find.byKey(const ValueKey('wizard-next')));
     await tester.pumpAndSettle();
 
     // Étape 2 : sexe, race, couleur et parents
-    expect(find.text('Race & origines'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('gender-male')));
     expect(find.text('Parents'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('gender-male')));
     expect(find.text('Père ♂'), findsOneWidget);
 
     // Bouton Retour : la saisie de l'étape 1 est conservée
     await tester.tap(find.byKey(const ValueKey('wizard-back')));
     await tester.pumpAndSettle();
-    expect(find.text('Identité'), findsOneWidget);
     expect(find.text('Noisette'), findsOneWidget);
 
     // Étape 3 : l'emplacement, et le bouton d'enregistrement
@@ -77,7 +66,6 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('wizard-next')));
       await tester.pumpAndSettle();
     }
-    expect(find.text('Emplacement'), findsOneWidget);
     expect(find.byKey(const ValueKey('wizard-save')), findsOneWidget);
     expect(find.text('Enregistrer'), findsOneWidget);
   });

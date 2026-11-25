@@ -100,6 +100,7 @@ class SyncService extends ChangeNotifier {
   List<RejectedRecord> _rejected = [];
   List<ActionLogEntry> _history = [];
   StreamSubscription<bool>? _connectivitySub;
+  VoidCallback? onSyncCompleted;
 
   SyncStatus get status => _status;
   int get pendingCount => _pendingCount;
@@ -372,6 +373,11 @@ class SyncService extends ChangeNotifier {
       _isSyncing = false;
       await refreshPendingCount();
       notifyListeners();
+      try {
+        onSyncCompleted?.call();
+      } catch (e) {
+        debugPrint('onSyncCompleted callback error: $e');
+      }
     }
   }
 

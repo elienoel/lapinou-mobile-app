@@ -282,7 +282,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('wizard-next')));
       await tester.pumpAndSettle();
-      expect(find.text('Emplacement'), findsOneWidget);
 
       // choisir la cage A1
       await tester.tap(find.textContaining('Cage A1'));

@@ -27,49 +27,22 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _picker = ImagePicker();
-
-  final _firstName = TextEditingController();
-  final _lastName = TextEditingController();
-  final _farmName = TextEditingController();
-  final _location = TextEditingController();
-  final _email = TextEditingController();
-  final _bio = TextEditingController();
-
-  bool _isSaving = false;
-  // Les informations s'affichent en lecture ; le formulaire n'apparaît qu'après « Modifier »
-  bool _isEditing = false;
   bool _isUploadingPhoto = false;
-  int? _loadedForUserId;
 
-  @override
-  void dispose() {
-    for (final c in [
-      _firstName,
-      _lastName,
-      _farmName,
-      _location,
-      _email,
-      _bio,
-    ]) {
-      c.dispose();
-    }
-    super.dispose();
+  void _openEditProfileModal(AuthUser user) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _EditProfileBottomSheet(user: user),
+    );
   }
 
-  /// Remplit le formulaire avec les données du compte (au premier affichage et après un rafraîchissement)
-  void _fillFrom(AuthUser user) {
-    _firstName.text = user.firstName ?? '';
-    _lastName.text = user.lastName ?? '';
-    _farmName.text = user.farmName ?? '';
-    _location.text = user.location ?? '';
-    _email.text = user.email ?? '';
-    _bio.text = user.bio ?? '';
-    _loadedForUserId = user.id;
-  }
-
-  // ---- Photo de profil ----
+  // ---- Compte ----
 
   void _showPhotoOptions(AuthUser user) {
     showModalBottomSheet(
@@ -158,43 +131,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : showAppSnack(context, error, error: true);
   }
 
-  // ---- Informations ----
-
-  Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    FocusScope.of(context).unfocus();
-
-    setState(() => _isSaving = true);
-    final error = await context.read<AuthProvider>().updateProfile(
-      firstName: _firstName.text.trim(),
-      lastName: _lastName.text.trim(),
-      farmName: _farmName.text.trim(),
-      location: _location.text.trim(),
-      email: _email.text.trim(),
-      bio: _bio.text.trim(),
-    );
-    if (!mounted) return;
-    setState(() {
-      _isSaving = false;
-      if (error == null) _isEditing = false;
-    });
-    error == null
-        ? showAppSnack(context, 'Profil enregistré')
-        : showAppSnack(context, error, error: true);
-  }
-
-  void _startEditing(AuthUser user) {
-    _fillFrom(user);
-    setState(() => _isEditing = true);
-  }
-
-  /// Ferme le formulaire sans enregistrer : les champs reprennent les valeurs du compte.
-  void _cancelEditing(AuthUser user) {
-    _fillFrom(user);
-    FocusScope.of(context).unfocus();
-    setState(() => _isEditing = false);
-  }
-
   // ---- Compte ----
 
   Future<void> _confirmLogout() async {
@@ -233,8 +169,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
     if (user == null) return const SizedBox.shrink();
-
-    if (_loadedForUserId != user.id) _fillFrom(user);
 
     final rabbits = context.watch<RabbitProvider>();
 
@@ -612,148 +546,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildPersonalInfo(AuthUser user) {
-    InputDecoration deco(String label, IconData icon, {String? hint}) {
-      return InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 20, color: AppColors.primary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      );
-    }
-
-    if (!_isEditing) return _buildInfoView(user);
-
-    return _card(
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Informations personnelles',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _firstName,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: deco('Prénom', Icons.person_outline),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: _lastName,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: deco('Nom', Icons.badge_outlined),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _farmName,
-              textCapitalization: TextCapitalization.words,
-              decoration: deco("Nom de l'élevage", Icons.home_work_outlined),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _location,
-              textCapitalization: TextCapitalization.words,
-              decoration: deco(
-                'Localisation',
-                Icons.location_on_outlined,
-                hint: 'Ville, région',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              decoration: deco('Email (optionnel)', Icons.mail_outline),
-              validator: (v) {
-                final value = v?.trim() ?? '';
-                if (value.isEmpty) return null;
-                return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)
-                    ? null
-                    : 'Adresse email invalide';
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _bio,
-              maxLines: 3,
-              maxLength: 300,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: deco(
-                'À propos de vous',
-                Icons.notes_outlined,
-                hint: 'Races élevées, expérience…',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 48,
-                    child: OutlinedButton(
-                      key: const ValueKey('profile-cancel'),
-                      onPressed: _isSaving ? null : () => _cancelEditing(user),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text('Annuler'),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: SizedBox(
-                    height: 48,
-                    child: ElevatedButton(
-                      key: const ValueKey('profile-save'),
-                      onPressed: _isSaving ? null : _save,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child:
-                          _isSaving
-                              ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                              : const Text(
-                                'Enregistrer',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return _buildInfoView(user);
   }
 
   /// Informations personnelles en lecture seule, avec l'option « Modifier ».
@@ -814,7 +607,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               TextButton.icon(
                 key: const ValueKey('profile-edit'),
-                onPressed: () => _startEditing(user),
+                onPressed: () => _openEditProfileModal(user),
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('Modifier'),
               ),
@@ -961,6 +754,250 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
           child: const Text('Supprimer'),
         ),
       ],
+    );
+  }
+}
+
+/// Modal bottom sheet pour modifier les informations personnelles.
+class _EditProfileBottomSheet extends StatefulWidget {
+  final AuthUser user;
+
+  const _EditProfileBottomSheet({required this.user});
+
+  @override
+  State<_EditProfileBottomSheet> createState() => _EditProfileBottomSheetState();
+}
+
+class _EditProfileBottomSheetState extends State<_EditProfileBottomSheet> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _firstName;
+  late final TextEditingController _lastName;
+  late final TextEditingController _farmName;
+  late final TextEditingController _location;
+  late final TextEditingController _email;
+  late final TextEditingController _bio;
+
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _firstName = TextEditingController(text: widget.user.firstName ?? '');
+    _lastName = TextEditingController(text: widget.user.lastName ?? '');
+    _farmName = TextEditingController(text: widget.user.farmName ?? '');
+    _location = TextEditingController(text: widget.user.location ?? '');
+    _email = TextEditingController(text: widget.user.email ?? '');
+    _bio = TextEditingController(text: widget.user.bio ?? '');
+  }
+
+  @override
+  void dispose() {
+    _firstName.dispose();
+    _lastName.dispose();
+    _farmName.dispose();
+    _location.dispose();
+    _email.dispose();
+    _bio.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    FocusScope.of(context).unfocus();
+
+    setState(() => _isSaving = true);
+    final error = await context.read<AuthProvider>().updateProfile(
+      firstName: _firstName.text.trim(),
+      lastName: _lastName.text.trim(),
+      farmName: _farmName.text.trim(),
+      location: _location.text.trim(),
+      email: _email.text.trim(),
+      bio: _bio.text.trim(),
+    );
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    if (error == null) {
+      Navigator.pop(context);
+      showAppSnack(context, 'Profil enregistré');
+    } else {
+      showAppSnack(context, error, error: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    InputDecoration deco(String label, IconData icon, {String? hint}) {
+      return InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 20, color: AppColors.primary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      );
+    }
+
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Modifier mes informations',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                      tooltip: 'Fermer',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _firstName,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: deco('Prénom', Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _lastName,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: deco('Nom', Icons.badge_outlined),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _farmName,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: deco("Nom de l'élevage", Icons.home_work_outlined),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _location,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: deco(
+                    'Localisation',
+                    Icons.location_on_outlined,
+                    hint: 'Ville, région',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: deco('Email (optionnel)', Icons.mail_outline),
+                  validator: (v) {
+                    final value = v?.trim() ?? '';
+                    if (value.isEmpty) return null;
+                    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)
+                        ? null
+                        : 'Adresse email invalide';
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _bio,
+                  maxLines: 3,
+                  maxLength: 300,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: deco(
+                    'À propos de vous',
+                    Icons.notes_outlined,
+                    hint: 'Races élevées, expérience…',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          key: const ValueKey('profile-cancel'),
+                          onPressed: _isSaving ? null : () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text('Annuler'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          key: const ValueKey('profile-save'),
+                          onPressed: _isSaving ? null : _save,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child:
+                              _isSaving
+                                  ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                  : const Text(
+                                    'Enregistrer',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

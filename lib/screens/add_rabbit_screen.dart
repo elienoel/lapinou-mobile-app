@@ -38,11 +38,10 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
   String _selectedBreedName = 'Fauve de Bourgogne';
   late String _selectedColor;
   RabbitStatus _selectedStatus = RabbitStatus.active;
-  DateTime _birthDate = DateTime.now().subtract(const Duration(days: 180));
+  DateTime _birthDate = DateTime.now();
 
-  /// Faux tant que la date n'a pas été choisie (nouveau lapin) : on affiche
-  /// alors le placeholder, et elle est demandée avant de passer à l'étape 2.
-  late bool _birthDateSet = widget.initialRabbitToEdit != null;
+  /// Date de naissance définie par défaut à aujourd'hui
+  late bool _birthDateSet = true;
   bool _birthDateError = false;
   String? _selectedFatherId;
   String? _selectedCageId;
@@ -305,32 +304,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     final provider = context.read<RabbitProvider>();
     final kits = editedId == null ? 0 : provider.nursingKitsOf(editedId);
 
-    Widget choice({
-      required Key key,
-      required String label,
-      required bool selected,
-      required VoidCallback onTap,
-    }) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          key: key,
-          label: Text(label),
-          selected: selected,
-          onSelected: (_) => onTap(),
-          showCheckmark: false,
-          selectedColor: AppColors.primary,
-          backgroundColor: AppColors.secondaryTint,
-          side: BorderSide.none,
-          labelStyle: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : AppColors.textPrimary,
-          ),
-          shape: const StadiumBorder(),
-        ),
-      );
-    }
-
     Widget diagram(Cage c) {
       final d = CageDiagram(
         cage: c,
@@ -353,28 +326,154 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
           clipBehavior: Clip.none,
           child: Row(
             children: [
-              choice(
+              // Option "Aucune cage"
+              Material(
                 key: const ValueKey('cage-choice-none'),
-                label: 'Aucune cage',
-                selected: cage == null,
-                onTap:
-                    () => setState(() {
-                      _selectedCageId = null;
-                      _selectedCompartment = null;
-                    }),
-              ),
-              for (final c in cages)
-                choice(
-                  key: ValueKey('cage-choice-${c.id}'),
-                  label:
-                      'Cage ${c.name} · ${c.freeCount}/${c.compartmentsCount} libres',
-                  selected: c.id == cage?.id,
-                  onTap:
-                      () => setState(() {
-                        _selectedCageId = c.id;
-                        _selectedCompartment = _defaultCompartment(c);
-                      }),
+                color: cage == null ? AppColors.secondaryTint : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => setState(() {
+                    _selectedCageId = null;
+                    _selectedCompartment = null;
+                  }),
+                  child: Container(
+                    width: 132,
+                    height: 104,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: cage == null
+                            ? AppColors.primary
+                            : AppColors.cardBorder,
+                        width: cage == null ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.block_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        const Spacer(),
+                        const Text(
+                          'Aucune cage',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Non assigné',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              for (final c in cages) ...[
+                Material(
+                  key: ValueKey('cage-choice-${c.id}'),
+                  color: c.id == cage?.id ? AppColors.secondaryTint : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => setState(() {
+                      _selectedCageId = c.id;
+                      _selectedCompartment = _defaultCompartment(c);
+                    }),
+                    child: Container(
+                      width: 132,
+                      height: 104,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: c.id == cage?.id
+                              ? AppColors.primary
+                              : (c.isFull
+                                  ? AppColors.statusPregnantText.withAlpha(90)
+                                  : AppColors.cardBorder),
+                          width: c.id == cage?.id ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Cage ${c.name}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            (c.location ?? '').isEmpty ? ' ' : c.location!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const Spacer(),
+                          // Une pastille par loge : pleine = occupée
+                          Wrap(
+                            spacing: 3,
+                            runSpacing: 3,
+                            children: [
+                              for (final slot in c.slots.take(16))
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: BoxDecoration(
+                                    color: slot.isFree
+                                        ? Colors.transparent
+                                        : AppColors.primary,
+                                    borderRadius: BorderRadius.circular(3),
+                                    border: Border.all(
+                                      color: slot.isFree
+                                          ? AppColors.primarySoftBorder
+                                          : AppColors.primary,
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${c.occupiedCount}/${c.compartmentsCount} loges',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: c.isFull
+                                  ? AppColors.statusPregnantText
+                                  : AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
             ],
           ),
         ),
@@ -553,8 +652,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
 
   // ---- Assistant en 3 étapes ----
 
-  static const _stepTitles = ['Identité', 'Race & origines', 'Emplacement'];
-
   /// Passe à l'étape suivante si celle-ci est complète.
   void _next() {
     final formOk = _formKey.currentState?.validate() ?? true;
@@ -693,39 +790,24 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
           ),
           Padding(
             padding: const EdgeInsets.only(left: 12, top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  _stepTitles[_step],
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    for (var i = 0; i < 3; i++) ...[
-                      if (i > 0) const SizedBox(width: 6),
-                      Expanded(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color:
-                                i <= _step
-                                    ? Colors.white
-                                    : Colors.white.withAlpha(70),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
+                for (var i = 0; i < 3; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color:
+                            i <= _step
+                                ? Colors.white
+                                : Colors.white.withAlpha(70),
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -842,10 +924,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     final hasPhoto =
         _pickedPhotoFile != null ||
         (existingPhoto != null && existingPhoto.isNotEmpty);
-    // Cadre : 85 % de la largeur de l'écran, au format 2,1:1
-    final frameWidth = MediaQuery.of(context).size.width * 0.85;
-    final frameHeight = frameWidth / 2.1;
-
     Widget photoContent;
     if (_pickedPhotoFile != null) {
       photoContent = Image.file(_pickedPhotoFile!, fit: BoxFit.cover);
@@ -860,67 +938,46 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Cadre photo
-        Center(
-          child: Column(
-            children: [
-              GestureDetector(
-                key: const ValueKey('photo-frame'),
-                onTap: _showPhotoOptions,
-                child: Container(
-                  width: frameWidth,
-                  height: frameHeight,
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(28),
-                    borderRadius: BorderRadius.circular(36),
-                    border: Border.all(
-                      color: Colors.white.withAlpha(150),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(30),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(29),
-                    child: SizedBox.expand(child: photoContent),
-                  ),
+        // Carte photo carrée 1:1 prenant toute la largeur disponible avec border radius de 7
+        GestureDetector(
+          key: const ValueKey('photo-frame'),
+          onTap: _showPhotoOptions,
+          child: AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(28),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: Colors.white.withAlpha(150),
+                  width: 2,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(30),
+                    blurRadius: 15,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _showPhotoOptions,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                label: Text(
-                  hasPhoto ? 'Changer la photo' : 'Ajouter une photo',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: SizedBox.expand(child: photoContent),
               ),
-            ],
+            ),
           ),
         ),
         const SizedBox(height: 32),
 
-        // Nom : gros texte, sans bordure ni label, sur le violet
+        // Nom : gros texte centré, sans bordure ni label, sur le violet
         TextFormField(
           controller: _nameController,
           textCapitalization: TextCapitalization.words,
+          textAlign: TextAlign.center,
           cursorColor: Colors.white,
           style: const TextStyle(
             fontSize: 34,
@@ -957,7 +1014,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Date de naissance : même style, ouvre le calendrier
+        // Date de naissance : même style centré, ouvre le calendrier
         InkWell(
           key: const ValueKey('birth-date'),
           onTap: _pickBirthDate,
@@ -965,14 +1022,16 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
+                Flexible(
                   child: Text(
                     _birthDateSet
                         ? DateFormat('d MMMM yyyy', 'fr_FR').format(_birthDate)
                         : 'Date de naissance',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 30,
+                      fontSize: 26,
                       fontWeight: FontWeight.w800,
                       color:
                           _birthDateSet
@@ -982,6 +1041,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Icon(
                   Icons.edit_calendar_outlined,
                   color: Colors.white.withAlpha(200),
@@ -993,6 +1053,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
         if (_birthDateSet)
           Text(
             _ageLabel(_birthDate),
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -1002,6 +1063,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
         else if (_birthDateError)
           const Text(
             'Choisissez la date de naissance',
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -1057,7 +1119,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
               child: _buildGenderOption(
                 label: 'Femelle ♀',
                 gender: RabbitGender.female,
-                color: AppColors.femalePink,
               ),
             ),
             const SizedBox(width: 12),
@@ -1065,7 +1126,6 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
               child: _buildGenderOption(
                 label: 'Mâle ♂',
                 gender: RabbitGender.male,
-                color: AppColors.maleBlue,
               ),
             ),
           ],
@@ -1310,14 +1370,18 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       child: Container(
         width: 140,
         height: 80,
-        padding: const EdgeInsets.only(left: 12, top: 10, right: 10, bottom: 3),
+        padding: const EdgeInsets.only(left: 12, top: 10, right: 10, bottom: 0),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.secondaryTint,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(10),
-            topRight: const Radius.circular(30),
-            bottomLeft: const Radius.circular(0),
-            bottomRight: const Radius.circular(10),
+          color: AppColors.secondaryTint,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(10),
+            topRight: Radius.circular(10),
+            bottomLeft: Radius.circular(10),
+            bottomRight: Radius.circular(10),
+          ),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.transparent,
+            width: selected ? 3 : 1,
           ),
         ),
         child: Stack(
@@ -1331,10 +1395,10 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
                 name,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
-                  color: selected ? Colors.white : AppColors.textPrimary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -1358,15 +1422,15 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
       height: 58,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: selected ? Colors.white.withAlpha(35) : AppColors.primarySoft,
+        color: AppColors.primarySoft,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: selected ? Colors.white : AppColors.cardBorder,
+          color: AppColors.cardBorder,
         ),
       ),
-      child: Icon(
+      child: const Icon(
         Icons.pets,
-        color: selected ? Colors.white : AppColors.primary,
+        color: AppColors.primary,
         size: 24,
       ),
     );
@@ -1416,24 +1480,26 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
     );
   }
 
-  /// Choix du sexe : pastille pleine dans la couleur du sexe quand elle est choisie.
+  /// Choix du sexe : respecte les couleurs du projet (pas de rose ni de bleu).
   Widget _buildGenderOption({
     required String label,
     required RabbitGender gender,
-    required Color color,
   }) {
     final isSelected = _selectedGender == gender;
     return InkWell(
       key: ValueKey('gender-${gender.name}'),
       onTap: () => setState(() => _selectedGender = gender),
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(7),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? color : color.withAlpha(20),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: isSelected ? color : color.withAlpha(90)),
+          color: isSelected ? AppColors.primary : AppColors.secondaryTint,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.cardBorder,
+            width: isSelected ? 1.8 : 1.0,
+          ),
         ),
         alignment: Alignment.center,
         child: Text(
@@ -1441,7 +1507,7 @@ class _AddRabbitScreenState extends State<AddRabbitScreen> {
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
-            color: isSelected ? Colors.white : color,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
           ),
         ),
       ),

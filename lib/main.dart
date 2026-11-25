@@ -16,7 +16,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/phone_login_screen.dart';
+import 'services/analytics_service.dart';
 import 'services/auth_http_client.dart';
+import 'services/push_notification_service.dart';
 import 'services/reminder_notifications.dart';
 import 'services/sync_service.dart';
 import 'theme/app_theme.dart';
@@ -31,8 +33,10 @@ void main() {
   // `ensureInitialized` et `runApp` s'exécutent dans la même zone.
   http.runWithClient(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    await AnalyticsService.instance.init();
     await initializeDateFormatting('fr_FR', null);
     await ReminderNotifications.instance.init();
+    await PushNotificationService.instance.init();
     SyncService.instance.start();
     runApp(const ClapInApp());
   }, () => AuthHttpClient(inner));

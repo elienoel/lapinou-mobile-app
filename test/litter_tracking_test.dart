@@ -570,8 +570,6 @@ void main() {
 
       expect(find.text('7 lapereaux au nid'), findsOneWidget);
 
-      await tester.tap(find.text('Descendance'));
-      await tester.pumpAndSettle();
       expect(find.text('Portées (2)'), findsOneWidget);
       final totals = find.byKey(const ValueKey('litter-totals'));
       expect(find.descendant(of: totals, matching: find.text('12')), findsOneWidget); // nés vivants
@@ -595,8 +593,6 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.textContaining('lapereaux au nid'), findsNothing, reason: 'seule la mère héberge les lapereaux');
-      await tester.tap(find.text('Descendance'));
-      await tester.pumpAndSettle();
       expect(find.text('Portées (1)'), findsOneWidget);
       expect(find.textContaining('Avec la mère Luna'), findsOneWidget);
     });

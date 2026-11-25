@@ -135,6 +135,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                                 const SizedBox(height: 12),
 
                                 _buildHorizontalActivitySummary(
+                                  context,
                                   provider,
                                   totalIncome,
                                   totalExpense,
@@ -419,6 +420,41 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return 'Aucun soin en retard';
   }
 
+  /// Calcule le détail dynamique pour la carte Gestations :
+  /// - S'il n'y a aucune gestation en cours : 'Aucune en cours'
+  /// - Sinon, temps restant jusqu'à la prochaine mise bas attendue.
+  String _gestationDetail(BuildContext context, RabbitProvider provider) {
+    final count = provider.activePregnanciesCount;
+    if (count == 0) return 'Aucune en cours';
+
+    final breedingSettings = context.watch<BreedingSettingsProvider>().settings;
+    final matings = provider.matingsAwaitingKindling;
+    if (matings.isEmpty) {
+      return '$count en cours';
+    }
+
+    // Trouver le nombre minimum de jours jusqu'à la prochaine mise bas
+    int minDays = 999999;
+    for (final m in matings) {
+      final days = m.daysUntilKindlingWith(breedingSettings.gestationDays);
+      if (days < minDays) {
+        minDays = days;
+      }
+    }
+
+    if (minDays <= -2) {
+      return 'En retard (${minDays.abs()} j)';
+    } else if (minDays == -1) {
+      return 'En retard (1 j)';
+    } else if (minDays == 0) {
+      return 'Prévue aujourd\'hui';
+    } else if (minDays == 1) {
+      return 'Prévue demain';
+    } else {
+      return 'Prochaine dans $minDays j';
+    }
+  }
+
   /// Pictogramme d'une carte : une icône vectorielle [AppIcons], ou une icône Material.
   Widget _iconOf(Object icon, {required double size, required Color color}) {
     if (icon is AppIcons) return AppIcon(icon, size: size, color: color);
@@ -507,6 +543,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   Widget _buildHorizontalActivitySummary(
+    BuildContext context,
     RabbitProvider provider,
     double totalIncome,
     double totalExpense,
@@ -534,7 +571,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             icon: Icons.hourglass_empty,
             value: '${provider.activePregnanciesCount}',
             label: 'Gestations',
-            detail: 'Prochaine dans ~2 j',
+            detail: _gestationDetail(context, provider),
             badge: 'Mise bas',
           ),
           const SizedBox(width: 12),
@@ -729,10 +766,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     child: Image.asset(
                       imageAsset,
                       // Illustrations détourées entières, photos en plein cadre
-                      fit:
-                          imageAsset.endsWith('.webp')
-                              ? BoxFit.contain
-                              : BoxFit.cover,
+                      fit:BoxFit.contain
+                     
                     ),
                   ),
                 ),

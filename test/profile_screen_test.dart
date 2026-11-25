@@ -88,12 +88,12 @@ void main() {
     expect(find.text('Enregistrer'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('profile-edit')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
+    expect(find.text('Modifier mes informations'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Awa'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'awa@lac.ci'), findsOneWidget);
     expect(find.text('Enregistrer'), findsOneWidget);
-    expect(find.byKey(const ValueKey('profile-edit')), findsNothing);
   });
 
   testWidgets('empty fields show a placeholder in read mode', (tester) async {
@@ -129,11 +129,11 @@ void main() {
     await _pumpProfile(tester);
 
     await tester.tap(find.byKey(const ValueKey('profile-edit')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Awa'), 'Zoé');
     await tester.ensureVisible(find.byKey(const ValueKey('profile-cancel')));
     await tester.tap(find.byKey(const ValueKey('profile-cancel')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.byType(TextFormField), findsNothing);
     expect(find.text('Awa'), findsOneWidget);
@@ -142,7 +142,7 @@ void main() {
     // rouvrir le formulaire repart des valeurs du compte
     await tester.ensureVisible(find.byKey(const ValueKey('profile-edit')));
     await tester.tap(find.byKey(const ValueKey('profile-edit')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.widgetWithText(TextFormField, 'Awa'), findsOneWidget);
   });
 
@@ -176,7 +176,7 @@ void main() {
 
     await http.runWithClient(() async {
       await tester.tap(find.byKey(const ValueKey('profile-edit')));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.enterText(find.widgetWithText(TextFormField, 'Awa'), 'Zoé');
       await tester.ensureVisible(find.byKey(const ValueKey('profile-save')));
       await tester.tap(find.byKey(const ValueKey('profile-save')));
@@ -193,14 +193,14 @@ void main() {
     await _pumpProfile(tester);
 
     await tester.tap(find.byKey(const ValueKey('profile-edit')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextFormField, 'awa@lac.ci'),
       'pas-un-email',
     );
     await tester.ensureVisible(find.text('Enregistrer'));
     await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Adresse email invalide'), findsOneWidget);
     // le formulaire reste ouvert pour corriger

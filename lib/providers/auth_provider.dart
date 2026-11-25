@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/currency.dart';
+import '../services/analytics_service.dart';
 import '../services/api_constants.dart';
 import '../services/auth_http_client.dart';
 import '../services/local_database.dart';
@@ -181,6 +182,11 @@ class AuthProvider extends ChangeNotifier {
         await LocalDatabase.instance.switchToUser('${user.id}');
         _setToken(savedToken);
         _user = user;
+        AnalyticsService.instance.setUser(
+          userId: '${user.id}',
+          email: user.email,
+          phone: user.phoneNumber,
+        );
         notifyListeners();
         refreshProfile();
       }
@@ -268,6 +274,11 @@ class AuthProvider extends ChangeNotifier {
         _setToken(payload['token']);
         _refreshToken = payload['refresh'];
         _user = user;
+        AnalyticsService.instance.setUser(
+          userId: '${user.id}',
+          email: user.email,
+          phone: user.phoneNumber,
+        );
 
         // Sauvegarder la session localement
         final prefs = await SharedPreferences.getInstance();
@@ -490,6 +501,7 @@ class AuthProvider extends ChangeNotifier {
     _setToken(null);
     _refreshToken = null;
     _user = null;
+    AnalyticsService.instance.clearUser();
     _pendingPhoneNumber = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');

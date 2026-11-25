@@ -130,7 +130,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
     return InkWell(
       key: key,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(2),
+      borderRadius: BorderRadius.circular(7),
       child: Container(
         width: 50,
         height: 50,
@@ -178,7 +178,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
     return InkWell(
       key: key,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(2),
+      borderRadius: BorderRadius.circular(7),
       child: Semantics(
         label: month.label,
         child: Container(
@@ -258,6 +258,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
 
     double parsedAmount =
         double.tryParse(initialAmountStr.replaceAll(',', '.')) ?? 0.0;
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -670,78 +671,97 @@ class _FinancesScreenState extends State<FinancesScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: () async {
-                            final title = titleController.text.trim();
-                            final amount =
-                                double.tryParse(
-                                  amountController.text.replaceAll(',', '.'),
-                                ) ??
-                                0.0;
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  final title = titleController.text.trim();
+                                  final amount =
+                                      double.tryParse(
+                                        amountController.text.replaceAll(',', '.'),
+                                      ) ??
+                                      0.0;
 
-                            final amountError = Validators.amount(amount);
-                            if (amountError != null) {
-                              showAppSnack(context, amountError, error: true);
-                              return;
-                            }
-                            if (title.isNotEmpty) {
-                              final tx = FinanceTransaction(
-                                id:
-                                    existing?.id ??
-                                    'fin-${DateTime.now().millisecondsSinceEpoch}',
-                                type:
-                                    isIncome
-                                        ? TransactionType.income
-                                        : TransactionType.expense,
-                                title: title,
-                                amount: amount,
-                                date: txDate,
-                                category:
-                                    selectedCategory ??
-                                    (isIncome ? 'Vente' : 'Dépense'),
-                                notes:
-                                    notesController.text.trim().isEmpty
-                                        ? null
-                                        : notesController.text.trim(),
-                              );
-                              final messenger = ScaffoldMessenger.of(context);
-                              final navigator = Navigator.of(ctx);
-                              if (isEditing) {
-                                await provider.updateFinanceTransaction(tx);
-                              } else {
-                                await provider.addFinanceTransaction(tx);
-                              }
-                              navigator.pop();
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    isEditing
-                                        ? 'Modifications enregistrées.'
-                                        : (isIncome
-                                            ? 'Vente de ${currency.format(amount)} enregistrée !'
-                                            : 'Dépense de ${currency.format(amount)} enregistrée.'),
-                                  ),
-                                  backgroundColor:
-                                      isIncome
-                                          ? AppColors.primary
-                                          : Colors.orange.shade800,
-                                ),
-                              );
-                            }
-                          },
+                                  final amountError = Validators.amount(amount);
+                                  if (amountError != null) {
+                                    showAppSnack(context, amountError, error: true);
+                                    return;
+                                  }
+                                  if (title.isNotEmpty) {
+                                    setSheetState(() => isSaving = true);
+                                    try {
+                                      final tx = FinanceTransaction(
+                                        id:
+                                            existing?.id ??
+                                            'fin-${DateTime.now().millisecondsSinceEpoch}',
+                                        type:
+                                            isIncome
+                                                ? TransactionType.income
+                                                : TransactionType.expense,
+                                        title: title,
+                                        amount: amount,
+                                        date: txDate,
+                                        category:
+                                            selectedCategory ??
+                                            (isIncome ? 'Vente' : 'Dépense'),
+                                        notes:
+                                            notesController.text.trim().isEmpty
+                                                ? null
+                                                : notesController.text.trim(),
+                                      );
+                                      final messenger = ScaffoldMessenger.of(context);
+                                      final navigator = Navigator.of(ctx);
+                                      if (isEditing) {
+                                        await provider.updateFinanceTransaction(tx);
+                                      } else {
+                                        await provider.addFinanceTransaction(tx);
+                                      }
+                                      navigator.pop();
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            isEditing
+                                                ? 'Modifications enregistrées.'
+                                                : (isIncome
+                                                    ? 'Vente de ${currency.format(amount)} enregistrée !'
+                                                    : 'Dépense de ${currency.format(amount)} enregistrée.'),
+                                          ),
+                                          backgroundColor:
+                                              isIncome
+                                                  ? AppColors.primary
+                                                  : Colors.orange.shade800,
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      setSheetState(() => isSaving = false);
+                                      if (context.mounted) {
+                                        showAppSnack(context, 'Erreur: $e', error: true);
+                                      }
+                                    }
+                                  }
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
                                 isIncome
                                     ? AppColors.primary
                                     : Colors.orange.shade800,
                           ),
-                          child: Text(
-                            isEditing
-                                ? 'Enregistrer les modifications'
-                                : (isIncome
-                                    ? 'Valider la Vente (+)'
-                                    : 'Valider la Dépense (-)'),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          child: isSaving
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  isEditing
+                                      ? 'Enregistrer les modifications'
+                                      : (isIncome
+                                          ? 'Valider la Vente (+)'
+                                          : 'Valider la Dépense (-)'),
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
                         ),
                       ),
                       if (isEditing) ...[
@@ -811,16 +831,13 @@ class _FinancesScreenState extends State<FinancesScreen> {
         filteredList = [...filteredList]
           ..sort((a, b) => b.date.compareTo(a.date));
 
-        String pageTitle = 'Comptabilité du Clapier';
-        if (_selectedFilterIndex == 1) pageTitle = 'Dépenses du Clapier';
-        if (_selectedFilterIndex == 2) pageTitle = 'Ventes & Recettes';
+        String pageTitle = 'Finances';
+        if (_selectedFilterIndex == 1) pageTitle = 'Dépenses';
+        if (_selectedFilterIndex == 2) pageTitle = 'Ventes';
 
         return Scaffold(
           appBar: AppBar(
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-              onPressed: () => Navigator.pop(context),
-            ),
+            
             title: Text(pageTitle),
           ),
           body: SafeArea(

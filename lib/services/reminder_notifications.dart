@@ -50,8 +50,26 @@ class ReminderNotifications {
       importance: Importance.high,
       priority: Priority.high,
     ),
-    iOS: DarwinNotificationDetails(),
+    iOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
   );
+
+  /// Affiche une notification immédiate (utilisé notamment lors de la réception d'un push en avant-plan).
+  Future<void> showInstantNotification({
+    required String title,
+    required String body,
+    int id = 999999,
+  }) async {
+    if (!_ready) return;
+    try {
+      await _plugin.show(id, title, body, _details);
+    } catch (e) {
+      debugPrint('Affichage notification instantanée: $e');
+    }
+  }
 
   Future<void> init() async {
     if (kIsWeb) return;
